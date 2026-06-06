@@ -1,4 +1,3 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
 # dependencies
 node_modules/
@@ -40,9 +39,10 @@ yarn-error.*
 /ios
 /android
 
-# AI/IDE tool files (optional, personal preference)
+# AI/IDE tool files 
 .claude/
 .stitch/
 .gemini/
 
+# markdown files
 *.md
