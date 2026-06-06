@@ -8,8 +8,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AudioProvider } from './src/audio/AudioProvider';
+import { TabNavigator } from './src/navigation/TabNavigator';
 import { RootStackParamList } from './src/navigation/types';
-import { HomeScreen } from './src/screens/HomeScreen';
 import { PlayerScreen } from './src/screens/PlayerScreen';
 import { QueueScreen } from './src/screens/QueueScreen';
 import { usePlayerStore } from './src/store/playerStore';
@@ -52,12 +52,21 @@ export default function App() {
               screenOptions={{
                 headerShown: false,
                 contentStyle: { backgroundColor: colors.background },
-                animation: 'slide_from_right',
               }}
             >
-              <Stack.Screen name="Home" component={HomeScreen} />
-              <Stack.Screen name="Player" component={PlayerScreen} />
-              <Stack.Screen name="Queue" component={QueueScreen} />
+              {/* Main tab navigator is the root screen */}
+              <Stack.Screen name="MainTabs" component={TabNavigator} />
+              {/* Player and Queue open as full-screen modals over the tabs */}
+              <Stack.Screen
+                name="Player"
+                component={PlayerScreen}
+                options={{ animation: 'slide_from_bottom' }}
+              />
+              <Stack.Screen
+                name="Queue"
+                component={QueueScreen}
+                options={{ animation: 'slide_from_right' }}
+              />
             </Stack.Navigator>
           </NavigationContainer>
         </AudioProvider>

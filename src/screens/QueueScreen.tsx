@@ -1,10 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Artwork } from '../components/Artwork';
-import { MiniPlayer } from '../components/MiniPlayer';
 import { RootStackParamList } from '../navigation/types';
 import { selectCurrentSong, usePlayerStore } from '../store/playerStore';
 import { colors, radius, spacing } from '../theme';
@@ -88,13 +88,12 @@ export function QueueScreen({ navigation }: Props) {
             </View>
             <Text style={styles.emptyTitle}>Your queue is empty</Text>
             <Text style={styles.emptyCopy}>Add songs from Home and they will stay here between app launches.</Text>
-            <Pressable style={styles.explore} onPress={() => navigation.navigate('Home')}>
+            <Pressable style={styles.explore} onPress={() => navigation.navigate('MainTabs')}>
               <Text style={styles.exploreText}>Explore music</Text>
             </Pressable>
           </View>
         }
       />
-      <MiniPlayer navigation={navigation} />
     </SafeAreaView>
   );
 }

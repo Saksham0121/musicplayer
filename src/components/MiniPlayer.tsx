@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { NavigationProp } from '@react-navigation/native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAudioControls } from '../audio/AudioProvider';
 import { RootStackParamList } from '../navigation/types';
@@ -16,7 +15,6 @@ type Props = {
 };
 
 export function MiniPlayer({ navigation }: Props) {
-  const insets = useSafeAreaInsets();
   const song = usePlayerStore(selectCurrentSong);
   const isPlaying = usePlayerStore((state) => state.isPlaying);
   const position = usePlayerStore((state) => state.position);
@@ -26,7 +24,7 @@ export function MiniPlayer({ navigation }: Props) {
   if (!song) return null;
 
   return (
-    <View style={[styles.wrap, { bottom: Math.max(insets.bottom, 10) }]}>
+    <View style={styles.wrap}>
       <Slider
         value={position}
         maximumValue={Math.max(duration, 1)}
@@ -59,9 +57,8 @@ export function MiniPlayer({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   wrap: {
-    position: 'absolute',
-    left: spacing.md,
-    right: spacing.md,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
     backgroundColor: '#242429F5',
     borderRadius: radius.lg,
     borderWidth: 1,

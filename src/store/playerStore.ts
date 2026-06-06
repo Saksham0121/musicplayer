@@ -11,6 +11,8 @@ type PersistedState = {
   repeatMode: RepeatMode;
   shuffle: boolean;
   downloaded: Record<string, string>;
+  favorites: string[]; // song IDs
+  recentlyPlayed: Song[]; // last 20 played songs
 };
 
 type PlayerState = PersistedState & {
@@ -33,6 +35,8 @@ type PlayerState = PersistedState & {
   cycleRepeat: () => void;
   toggleShuffle: () => void;
   markDownloaded: (songId: string, localUri: string) => void;
+  toggleFavorite: (songId: string) => void;
+  isFavorite: (songId: string) => boolean;
 };
 
 const persist = (state: PlayerState) => {
@@ -42,6 +46,8 @@ const persist = (state: PlayerState) => {
     repeatMode: state.repeatMode,
     shuffle: state.shuffle,
     downloaded: state.downloaded,
+    favorites: state.favorites,
+    recentlyPlayed: state.recentlyPlayed,
   };
   void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
 };
@@ -52,6 +58,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   repeatMode: 'off',
   shuffle: false,
   downloaded: {},
+  favorites: [],
+  recentlyPlayed: [],
   hydrated: false,
   shouldPlay: false,
   isPlaying: false,
@@ -64,7 +72,13 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       const saved = await AsyncStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved) as PersistedState;
-        set({ ...parsed, downloaded: parsed.downloaded ?? {}, hydrated: true });
+        set({
+          ...parsed,
+          downloaded: parsed.downloaded ?? {},
+          favorites: parsed.favorites ?? [],
+          recentlyPlayed: parsed.recentlyPlayed ?? [],
+          hydrated: true,
+        });
         return;
       }
     } catch {
@@ -82,7 +96,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     const existingIndex = currentQueue.findIndex((item) => item.id === song.id);
     const queue = existingIndex >= 0 ? currentQueue : [...currentQueue, playableSong];
     const currentIndex = existingIndex >= 0 ? existingIndex : queue.length - 1;
-    set({ queue, currentIndex, shouldPlay: true, position: 0 });
+
+    // Update recently played (max 20, most recent first, no duplicates)
+    const prevRecent = get().recentlyPlayed.filter((s) => s.id !== song.id);
+    const recentlyPlayed = [playableSong, ...prevRecent].slice(0, 20);
+
+    set({ queue, currentIndex, shouldPlay: true, position: 0, recentlyPlayed });
     persist(get());
   },
 
@@ -181,6 +200,17 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     }));
     persist(get());
   },
+
+  toggleFavorite: (songId) => {
+    const { favorites } = get();
+    const newFavorites = favorites.includes(songId)
+      ? favorites.filter((id) => id !== songId)
+      : [...favorites, songId];
+    set({ favorites: newFavorites });
+    persist(get());
+  },
+
+  isFavorite: (songId) => get().favorites.includes(songId),
 }));
 
 export const selectCurrentSong = (state: PlayerState) =>

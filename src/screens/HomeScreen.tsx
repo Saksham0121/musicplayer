@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -17,7 +18,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { searchSongs } from '../api/saavn';
 import { Artwork } from '../components/Artwork';
-import { MiniPlayer } from '../components/MiniPlayer';
 import { SongRow } from '../components/SongRow';
 import { RootStackParamList } from '../navigation/types';
 import { usePlayerStore } from '../store/playerStore';
@@ -25,11 +25,10 @@ import { colors, radius, spacing } from '../theme';
 import { Song } from '../types/music';
 import { pickImage } from '../utils/music';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
-
 const DEFAULT_QUERY = 'Bollywood hits';
 
-export function HomeScreen({ navigation }: Props) {
+export function HomeScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { width } = useWindowDimensions();
   const playSong = usePlayerStore((state) => state.playSong);
   const [input, setInput] = useState('');
@@ -195,14 +194,13 @@ export function HomeScreen({ navigation }: Props) {
           loadingMore ? <ActivityIndicator color={colors.accent} style={styles.footerLoader} /> : null
         }
       />
-      <MiniPlayer navigation={navigation} />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
-  content: { paddingBottom: 112 },
+  content: { paddingBottom: 24 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

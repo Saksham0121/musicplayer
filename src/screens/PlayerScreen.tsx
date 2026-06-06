@@ -23,9 +23,13 @@ export function PlayerScreen({ navigation }: Props) {
   const duration = usePlayerStore((state) => state.duration);
   const repeatMode = usePlayerStore((state) => state.repeatMode);
   const shuffle = usePlayerStore((state) => state.shuffle);
+  const favorites = usePlayerStore((state) => state.favorites);
   const cycleRepeat = usePlayerStore((state) => state.cycleRepeat);
   const toggleShuffle = usePlayerStore((state) => state.toggleShuffle);
+  const toggleFavorite = usePlayerStore((state) => state.toggleFavorite);
   const { toggle, seek, skipNext, skipPrevious } = useAudioControls();
+
+  const isFav = song ? favorites.includes(song.id) : false;
 
   if (!song) {
     return (
@@ -80,7 +84,17 @@ export function PlayerScreen({ navigation }: Props) {
                 {song.artist}
               </Text>
             </View>
-            <Ionicons name="heart-outline" size={26} color={colors.text} />
+            <Pressable
+              accessibilityLabel={isFav ? 'Remove from favourites' : 'Add to favourites'}
+              onPress={() => song && toggleFavorite(song.id)}
+              hitSlop={8}
+            >
+              <Ionicons
+                name={isFav ? 'heart' : 'heart-outline'}
+                size={26}
+                color={isFav ? colors.accent : colors.text}
+              />
+            </Pressable>
           </View>
 
           <Slider
