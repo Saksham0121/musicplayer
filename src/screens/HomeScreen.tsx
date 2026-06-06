@@ -30,6 +30,14 @@ import { formatTime, pickImage } from '../utils/music';
 
 const DEFAULT_QUERY = 'Bollywood hits';
 
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) return 'Good morning';
+  if (hour >= 12 && hour < 17) return 'Good afternoon';
+  if (hour >= 17 && hour < 21) return 'Good evening';
+  return 'Good night';
+}
+
 function sortSongs(songs: Song[], option: SortOption): Song[] {
   const sorted = [...songs];
   switch (option) {
@@ -201,18 +209,30 @@ export function HomeScreen() {
       <View style={styles.appBar}>
         <View style={styles.logoRow}>
           <Ionicons name="musical-notes" size={26} color={colors.accent} />
-          <Text style={styles.logoText}>Mume</Text>
+          <View>
+            <Text style={styles.logoText}>Mume</Text>
+            <Text style={styles.greeting}>{getGreeting()}</Text>
+          </View>
         </View>
-        <Pressable
-          style={styles.iconBtn}
-          onPress={() => {
-            setShowSearch((v) => !v);
-            setTimeout(() => searchRef.current?.focus(), 100);
-          }}
-          accessibilityLabel="Search"
-        >
-          <Ionicons name={showSearch ? 'close' : 'search'} size={22} color={colors.text} />
-        </Pressable>
+        <View style={styles.appBarActions}>
+          <Pressable
+            style={styles.iconBtn}
+            onPress={() => {
+              setShowSearch((v) => !v);
+              setTimeout(() => searchRef.current?.focus(), 100);
+            }}
+            accessibilityLabel="Search"
+          >
+            <Ionicons name={showSearch ? 'close' : 'search'} size={22} color={colors.text} />
+          </Pressable>
+          <Pressable
+            style={styles.iconBtn}
+            onPress={() => navigation.navigate('Queue')}
+            accessibilityLabel="Queue"
+          >
+            <Ionicons name="list" size={22} color={colors.text} />
+          </Pressable>
+        </View>
       </View>
 
       {/* ─── Search bar ────────────────────────────────────────────── */}
@@ -570,7 +590,9 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  logoText: { color: colors.text, fontSize: 24, fontWeight: '800', letterSpacing: -0.5 },
+  logoText: { color: colors.text, fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
+  greeting: { color: colors.muted, fontSize: 11, marginTop: 1 },
+  appBarActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   iconBtn: {
     width: 42,
     height: 42,

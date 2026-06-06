@@ -2,40 +2,93 @@ import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useRef, useState } from 'react';
+import {
+  Alert,
+  FlatList,
+  Modal,
+  Pressable,
+  Share,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAudioControls } from '../audio/AudioProvider';
 import { Artwork } from '../components/Artwork';
 import { RootStackParamList } from '../navigation/types';
+import { useLibraryStore } from '../store/libraryStore';
 import { selectCurrentSong, usePlayerStore } from '../store/playerStore';
 import { colors, radius, spacing } from '../theme';
 import { formatTime, pickImage } from '../utils/music';
+import { downloadSong } from '../services/downloads';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Player'>;
 
 export function PlayerScreen({ navigation }: Props) {
   const { width, height } = useWindowDimensions();
+
   const song = usePlayerStore(selectCurrentSong);
-  const isPlaying = usePlayerStore((state) => state.isPlaying);
-  const isBuffering = usePlayerStore((state) => state.isBuffering);
-  const position = usePlayerStore((state) => state.position);
-  const duration = usePlayerStore((state) => state.duration);
-  const repeatMode = usePlayerStore((state) => state.repeatMode);
-  const shuffle = usePlayerStore((state) => state.shuffle);
-  const favorites = usePlayerStore((state) => state.favorites);
-  const cycleRepeat = usePlayerStore((state) => state.cycleRepeat);
-  const toggleShuffle = usePlayerStore((state) => state.toggleShuffle);
-  const toggleFavorite = usePlayerStore((state) => state.toggleFavorite);
+  const isPlaying = usePlayerStore((s) => s.isPlaying);
+  const isBuffering = usePlayerStore((s) => s.isBuffering);
+  const position = usePlayerStore((s) => s.position);
+  const duration = usePlayerStore((s) => s.duration);
+  const repeatMode = usePlayerStore((s) => s.repeatMode);
+  const shuffle = usePlayerStore((s) => s.shuffle);
+  const favorites = usePlayerStore((s) => s.favorites);
+  const downloaded = usePlayerStore((s) => s.downloaded);
+  const cycleRepeat = usePlayerStore((s) => s.cycleRepeat);
+  const toggleShuffle = usePlayerStore((s) => s.toggleShuffle);
+  const toggleFavorite = usePlayerStore((s) => s.toggleFavorite);
+  const markDownloaded = usePlayerStore((s) => s.markDownloaded);
+  const addToQueue = usePlayerStore((s) => s.addToQueue);
+
+  const playlists = useLibraryStore((s) => s.playlists);
+  const addSongToPlaylist = useLibraryStore((s) => s.addSongToPlaylist);
+
   const { toggle, seek, skipNext, skipPrevious } = useAudioControls();
 
   const isFav = song ? favorites.includes(song.id) : false;
+  const isDownloaded = song ? !!downloaded[song.id] : false;
+
+  // Menus
+  const [showMenu, setShowMenu] = useState(false);
+  const [showPlaylistPicker, setShowPlaylistPicker] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  const handleSeekForward = () => void seek(Math.min(position + 10, duration));
+  const handleSeekBackward = () => void seek(Math.max(position - 10, 0));
+
+  const handleDownload = async () => {
+    if (!song || isDownloaded || downloading) return;
+    setDownloading(true);
+    try {
+      const uri = await downloadSong(song);
+      markDownloaded(song.id, uri);
+      Alert.alert('Downloaded', `"${song.title}" saved for offline listening.`);
+    } catch (e) {
+      Alert.alert('Download failed', e instanceof Error ? e.message : 'Could not download.');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!song) return;
+    setShowMenu(false);
+    await Share.share({ message: `🎵 Listening to "${song.title}" by ${song.artist} on Mume` });
+  };
+
+  // Artwork: make it nearly full width, fill more vertical space
+  const artworkSize = Math.min(width - 32, height * 0.40);
 
   if (!song) {
     return (
       <SafeAreaView style={styles.safe}>
-        <Pressable onPress={navigation.goBack} style={styles.back}>
-          <Ionicons name="chevron-down" size={28} color={colors.text} />
+        <Pressable onPress={navigation.goBack} style={styles.headerBtn}>
+          <Ionicons name="chevron-back" size={28} color={colors.text} />
         </Pressable>
         <View style={styles.noSong}>
           <Ionicons name="headset-outline" size={58} color={colors.subtle} />
@@ -45,48 +98,61 @@ export function PlayerScreen({ navigation }: Props) {
     );
   }
 
-  const artworkSize = Math.min(width - 48, height * 0.32, 430);
-
   return (
     <View style={styles.safe}>
-      <LinearGradient colors={['#3B2218', colors.background, colors.background]} style={StyleSheet.absoluteFill} />
+      <LinearGradient
+        colors={['#2A1810', '#14120F', colors.background]}
+        locations={[0, 0.45, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+
       <SafeAreaView style={styles.player}>
+        {/* ── Top Bar ─────────────────────────────────────────── */}
         <View style={styles.topBar}>
-          <Pressable accessibilityLabel="Close player" onPress={navigation.goBack} style={styles.iconButton}>
-            <Ionicons name="chevron-down" size={28} color={colors.text} />
+          <Pressable
+            accessibilityLabel="Close player"
+            onPress={navigation.goBack}
+            style={styles.iconButton}
+          >
+            <Ionicons name="chevron-back" size={28} color={colors.text} />
           </Pressable>
-          <View style={styles.topCopy}>
-            <Text style={styles.nowPlaying}>NOW PLAYING</Text>
-            <Text style={styles.album} numberOfLines={1}>
-              {song.album}
-            </Text>
+
+          <View style={styles.topCenter}>
+            <Text style={styles.nowPlayingLabel}>NOW PLAYING</Text>
+            <Text style={styles.albumLabel} numberOfLines={1}>{song.album}</Text>
           </View>
-          <Pressable accessibilityLabel="Open queue" onPress={() => navigation.navigate('Queue')} style={styles.iconButton}>
-            <Ionicons name="list" size={25} color={colors.text} />
+
+          <Pressable
+            accessibilityLabel="More options"
+            onPress={() => setShowMenu(true)}
+            style={styles.iconButton}
+          >
+            <Ionicons name="ellipsis-horizontal" size={24} color={colors.text} />
           </Pressable>
         </View>
 
+        {/* ── Artwork ─────────────────────────────────────────── */}
         <View style={styles.artworkWrap}>
-          <Artwork
-            uri={pickImage(song)}
-            style={{ width: artworkSize, height: artworkSize }}
-            radius={radius.xl}
-          />
+          <View style={[styles.artworkShadow, { width: artworkSize, height: artworkSize }]}>
+            <Artwork
+              uri={pickImage(song)}
+              style={{ width: artworkSize, height: artworkSize }}
+              radius={radius.xl}
+            />
+          </View>
         </View>
 
-        <View style={styles.details}>
+        {/* ── Details + Controls ──────────────────────────────── */}
+        <View style={styles.controls}>
+          {/* Title + Favourite */}
           <View style={styles.titleRow}>
             <View style={styles.titleCopy}>
-              <Text style={styles.title} numberOfLines={1}>
-                {song.title}
-              </Text>
-              <Text style={styles.artist} numberOfLines={1}>
-                {song.artist}
-              </Text>
+              <Text style={styles.title} numberOfLines={1}>{song.title}</Text>
+              <Text style={styles.artist} numberOfLines={1}>{song.artist}</Text>
             </View>
             <Pressable
               accessibilityLabel={isFav ? 'Remove from favourites' : 'Add to favourites'}
-              onPress={() => song && toggleFavorite(song.id)}
+              onPress={() => toggleFavorite(song.id)}
               hitSlop={8}
             >
               <Ionicons
@@ -97,6 +163,7 @@ export function PlayerScreen({ navigation }: Props) {
             </Pressable>
           </View>
 
+          {/* Seek bar */}
           <Slider
             value={position}
             maximumValue={Math.max(duration, 1)}
@@ -111,38 +178,240 @@ export function PlayerScreen({ navigation }: Props) {
             <Text style={styles.time}>{formatTime(duration)}</Text>
           </View>
 
-          <View style={styles.controls}>
-            <Pressable accessibilityLabel="Toggle shuffle" onPress={toggleShuffle} style={styles.smallControl}>
-              <Ionicons name="shuffle" size={22} color={shuffle ? colors.accent : colors.muted} />
+          {/* Main playback controls */}
+          <View style={styles.mainControls}>
+            {/* Previous */}
+            <Pressable
+              accessibilityLabel="Previous song"
+              onPress={skipPrevious}
+              style={styles.controlBtn}
+            >
+              <Ionicons name="play-skip-back" size={28} color={colors.text} />
             </Pressable>
-            <Pressable accessibilityLabel="Previous song" onPress={skipPrevious} style={styles.controlButton}>
-              <Ionicons name="play-skip-back" size={30} color={colors.text} />
+
+            {/* Seek -10s */}
+            <Pressable
+              accessibilityLabel="Seek back 10 seconds"
+              onPress={handleSeekBackward}
+              style={styles.seekBtn}
+            >
+              <Ionicons name="reload" size={22} color={colors.text} />
+              <Text style={styles.seekLabel}>10</Text>
             </Pressable>
-            <Pressable accessibilityLabel={isPlaying ? 'Pause' : 'Play'} onPress={toggle} style={styles.playButton}>
+
+            {/* Play/Pause */}
+            <Pressable
+              accessibilityLabel={isPlaying ? 'Pause' : 'Play'}
+              onPress={toggle}
+              style={styles.playButton}
+            >
               <Ionicons
-                name={isPlaying ? 'pause' : 'play'}
-                size={35}
+                name={isBuffering ? 'hourglass-outline' : isPlaying ? 'pause' : 'play'}
+                size={36}
                 color={colors.white}
-                style={!isPlaying && { marginLeft: 3 }}
+                style={!isPlaying && !isBuffering && { marginLeft: 3 }}
               />
             </Pressable>
-            <Pressable accessibilityLabel="Next song" onPress={skipNext} style={styles.controlButton}>
-              <Ionicons name="play-skip-forward" size={30} color={colors.text} />
+
+            {/* Seek +10s */}
+            <Pressable
+              accessibilityLabel="Seek forward 10 seconds"
+              onPress={handleSeekForward}
+              style={styles.seekBtn}
+            >
+              <Ionicons name="reload" size={22} color={colors.text} style={{ transform: [{ scaleX: -1 }] }} />
+              <Text style={styles.seekLabel}>10</Text>
             </Pressable>
-            <Pressable accessibilityLabel={`Repeat mode ${repeatMode}`} onPress={cycleRepeat} style={styles.smallControl}>
+
+            {/* Next */}
+            <Pressable
+              accessibilityLabel="Next song"
+              onPress={skipNext}
+              style={styles.controlBtn}
+            >
+              <Ionicons name="play-skip-forward" size={28} color={colors.text} />
+            </Pressable>
+          </View>
+
+          {/* Secondary controls row */}
+          <View style={styles.secondaryControls}>
+            <Pressable
+              accessibilityLabel="Toggle shuffle"
+              onPress={toggleShuffle}
+              style={styles.secondaryBtn}
+            >
+              <Ionicons name="shuffle" size={22} color={shuffle ? colors.accent : colors.muted} />
+            </Pressable>
+
+            <Pressable
+              accessibilityLabel="Open queue"
+              onPress={() => navigation.navigate('Queue')}
+              style={styles.secondaryBtn}
+            >
+              <Ionicons name="list" size={22} color={colors.muted} />
+            </Pressable>
+
+            <Pressable
+              accessibilityLabel={`Repeat mode: ${repeatMode}`}
+              onPress={cycleRepeat}
+              style={styles.secondaryBtn}
+            >
               <Ionicons
                 name={repeatMode === 'one' ? 'repeat' : 'repeat-outline'}
-                size={23}
+                size={22}
                 color={repeatMode === 'off' ? colors.muted : colors.accent}
               />
               {repeatMode === 'one' && <Text style={styles.repeatOne}>1</Text>}
             </Pressable>
+
+            <Pressable
+              accessibilityLabel="More options"
+              onPress={() => setShowMenu(true)}
+              style={styles.secondaryBtn}
+            >
+              <Ionicons name="ellipsis-vertical" size={22} color={colors.muted} />
+            </Pressable>
           </View>
+
+          {/* Status */}
           <Text style={styles.status}>
-            {isBuffering ? 'Buffering high quality audio...' : song.localUri ? 'Playing offline' : 'Streaming high quality audio'}
+            {isBuffering
+              ? 'Buffering…'
+              : song.localUri
+                ? '📁 Playing offline'
+                : '✦ Streaming high quality audio'}
           </Text>
         </View>
       </SafeAreaView>
+
+      {/* ── Options Menu Modal ─────────────────────────────── */}
+      <Modal
+        visible={showMenu}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowMenu(false)}
+        statusBarTranslucent
+      >
+        <Pressable style={styles.menuBackdrop} onPress={() => setShowMenu(false)}>
+          <Pressable style={styles.menuSheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.menuHandle} />
+
+            {/* Song info */}
+            <View style={styles.menuSongInfo}>
+              <Artwork uri={pickImage(song, '150x150')} style={styles.menuArtwork} radius={10} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.menuSongTitle} numberOfLines={1}>{song.title}</Text>
+                <Text style={styles.menuSongArtist} numberOfLines={1}>{song.artist}</Text>
+              </View>
+            </View>
+            <View style={styles.menuDivider} />
+
+            {[
+              {
+                icon: 'heart' as const,
+                label: isFav ? 'Remove from Favourites' : 'Add to Favourites',
+                accent: isFav,
+                action: () => { toggleFavorite(song.id); setShowMenu(false); },
+              },
+              {
+                icon: 'list-outline' as const,
+                label: 'Add to Playlist',
+                action: () => { setShowMenu(false); setTimeout(() => setShowPlaylistPicker(true), 200); },
+              },
+              {
+                icon: 'play-skip-forward-outline' as const,
+                label: 'Play Next',
+                action: () => { addToQueue(song); setShowMenu(false); },
+              },
+              {
+                icon: 'add-circle-outline' as const,
+                label: 'Add to Queue',
+                action: () => { addToQueue(song); setShowMenu(false); },
+              },
+              {
+                icon: isDownloaded ? 'checkmark-circle' as const : 'arrow-down-circle-outline' as const,
+                label: isDownloaded ? 'Already Downloaded' : downloading ? 'Downloading…' : 'Download Song',
+                accent: isDownloaded,
+                action: () => { void handleDownload(); setShowMenu(false); },
+              },
+              {
+                icon: 'share-social-outline' as const,
+                label: 'Share',
+                action: handleShare,
+              },
+            ].map((item) => (
+              <Pressable
+                key={item.label}
+                style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
+                onPress={item.action}
+              >
+                <View style={[styles.menuIconWrap, item.accent && styles.menuIconWrapAccent]}>
+                  <Ionicons
+                    name={item.icon}
+                    size={19}
+                    color={item.accent ? colors.accent : colors.muted}
+                  />
+                </View>
+                <Text style={[styles.menuItemText, item.accent && styles.menuItemAccent]}>
+                  {item.label}
+                </Text>
+                <Ionicons name="chevron-forward" size={14} color={colors.subtle} />
+              </Pressable>
+            ))}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ── Playlist Picker Modal ────────────────────────────── */}
+      <Modal
+        visible={showPlaylistPicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPlaylistPicker(false)}
+        statusBarTranslucent
+      >
+        <Pressable style={styles.menuBackdrop} onPress={() => setShowPlaylistPicker(false)}>
+          <Pressable style={styles.menuSheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.menuHandle} />
+            <Text style={styles.pickerHeading}>Add to Playlist</Text>
+
+            {playlists.length === 0 ? (
+              <View style={styles.pickerEmpty}>
+                <Ionicons name="list-outline" size={36} color={colors.subtle} />
+                <Text style={styles.pickerEmptyText}>No playlists yet. Create one in the Playlists tab.</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={playlists}
+                keyExtractor={(p) => p.id}
+                style={{ maxHeight: 340 }}
+                renderItem={({ item }) => {
+                  const alreadyAdded = item.songs.some((s) => s.id === song.id);
+                  return (
+                    <Pressable
+                      style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
+                      onPress={() => {
+                        addSongToPlaylist(item.id, song);
+                        setShowPlaylistPicker(false);
+                        Alert.alert('Added ✓', `"${song.title}" added to "${item.name}"`);
+                      }}
+                    >
+                      <View style={styles.menuIconWrap}>
+                        <Ionicons name="musical-notes" size={18} color={colors.accent} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.menuItemText}>{item.name}</Text>
+                        <Text style={styles.pickerSubtext}>{item.songs.length} songs</Text>
+                      </View>
+                      {alreadyAdded && <Ionicons name="checkmark" size={18} color={colors.accent} />}
+                    </Pressable>
+                  );
+                }}
+              />
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -150,38 +419,85 @@ export function PlayerScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   player: { flex: 1 },
+
+  // No song
+  headerBtn: { marginTop: spacing.md, marginLeft: spacing.md, width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
+  noSong: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  noSongTitle: { color: colors.text, fontSize: 18, fontWeight: '800', marginTop: spacing.lg },
+
+  // Top bar
   topBar: {
-    height: 64,
+    height: 60,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.sm,
   },
   iconButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
-  topCopy: { flex: 1, alignItems: 'center', paddingHorizontal: spacing.sm },
-  nowPlaying: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.5 },
-  album: { color: colors.muted, fontSize: 12, marginTop: 3 },
+  topCenter: { flex: 1, alignItems: 'center' },
+  nowPlayingLabel: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.5 },
+  albumLabel: { color: colors.muted, fontSize: 12, marginTop: 2 },
+
+  // Artwork
   artworkWrap: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.xl,
+    paddingVertical: spacing.md,
   },
-  details: { paddingHorizontal: spacing.xl, paddingBottom: spacing.lg },
-  titleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
-  titleCopy: { flex: 1, paddingRight: spacing.lg },
-  title: { color: colors.text, fontSize: 25, fontWeight: '800' },
-  artist: { color: colors.muted, fontSize: 15, marginTop: 6 },
-  slider: { marginHorizontal: -4, height: 38 },
-  timeRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: -7 },
-  time: { color: colors.muted, fontSize: 11, fontVariant: ['tabular-nums'] },
+  artworkShadow: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.5,
+    shadowRadius: 24,
+    elevation: 20,
+    borderRadius: radius.xl,
+  },
+
+  // Controls section
   controls: {
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.md,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  titleCopy: { flex: 1, paddingRight: spacing.md },
+  title: { color: colors.text, fontSize: 22, fontWeight: '800' },
+  artist: { color: colors.muted, fontSize: 14, marginTop: 4 },
+
+  slider: { marginHorizontal: -4, height: 36 },
+  timeRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing.lg,
+    marginTop: -8,
+    marginBottom: spacing.lg,
   },
-  smallControl: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
-  controlButton: { width: 54, height: 54, alignItems: 'center', justifyContent: 'center' },
+  time: { color: colors.muted, fontSize: 11, fontVariant: ['tabular-nums'] },
+
+  // Main controls
+  mainControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.lg,
+  },
+  controlBtn: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
+  seekBtn: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  seekLabel: {
+    position: 'absolute',
+    bottom: 6,
+    color: colors.text,
+    fontSize: 9,
+    fontWeight: '800',
+  },
   playButton: {
     width: 72,
     height: 72,
@@ -191,13 +507,89 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     shadowColor: colors.accent,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.32,
-    shadowRadius: 14,
-    elevation: 10,
+    shadowOpacity: 0.45,
+    shadowRadius: 16,
+    elevation: 12,
   },
-  repeatOne: { position: 'absolute', color: colors.accent, fontSize: 8, fontWeight: '900' },
-  status: { color: colors.subtle, fontSize: 10, textAlign: 'center', marginTop: spacing.lg },
-  back: { marginTop: spacing.sm, marginLeft: spacing.md, width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
-  noSong: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  noSongTitle: { color: colors.text, fontSize: 18, fontWeight: '800', marginTop: spacing.lg },
+
+  // Secondary controls
+  secondaryControls: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  secondaryBtn: {
+    width: 48,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  repeatOne: {
+    position: 'absolute',
+    bottom: 5,
+    color: colors.accent,
+    fontSize: 8,
+    fontWeight: '900',
+  },
+
+  status: { color: colors.subtle, fontSize: 10, textAlign: 'center' },
+
+  // Options menu
+  menuBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
+  menuSheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    paddingTop: spacing.md,
+    paddingBottom: 40,
+    paddingHorizontal: spacing.xl,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  menuHandle: {
+    width: 38,
+    height: 4,
+    backgroundColor: colors.border,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: spacing.lg,
+  },
+  menuSongInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
+  menuArtwork: { width: 48, height: 48 },
+  menuSongTitle: { color: colors.text, fontSize: 15, fontWeight: '700' },
+  menuSongArtist: { color: colors.muted, fontSize: 12, marginTop: 2 },
+  menuDivider: { height: 1, backgroundColor: colors.border, marginBottom: spacing.md },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 11,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.md,
+    gap: spacing.md,
+  },
+  menuItemPressed: { backgroundColor: colors.surfaceElevated },
+  menuIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: colors.surfaceElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuIconWrapAccent: { backgroundColor: `${colors.accent}25` },
+  menuItemText: { flex: 1, color: colors.text, fontSize: 15, fontWeight: '600' },
+  menuItemAccent: { color: colors.accent },
+
+  // Playlist picker
+  pickerHeading: { color: colors.text, fontSize: 18, fontWeight: '800', marginBottom: spacing.md },
+  pickerEmpty: { alignItems: 'center', paddingVertical: spacing.xl, gap: spacing.md },
+  pickerEmptyText: { color: colors.muted, fontSize: 14, textAlign: 'center' },
+  pickerSubtext: { color: colors.muted, fontSize: 12, marginTop: 2 },
 });

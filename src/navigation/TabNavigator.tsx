@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MiniPlayer } from '../components/MiniPlayer';
@@ -24,26 +24,21 @@ const TAB_CONFIG: Array<{
   activeIcon: TabBarIconName;
 }> = [
   { name: 'Home', label: 'Home', icon: 'home-outline', activeIcon: 'home' },
-  { name: 'Favorites', label: 'Favorites', icon: 'heart-outline', activeIcon: 'heart' },
-  { name: 'Playlists', label: 'Playlists', icon: 'list-outline', activeIcon: 'list' },
+  { name: 'Favorites', label: 'Favourites', icon: 'heart-outline', activeIcon: 'heart' },
+  { name: 'Playlists', label: 'Playlists', icon: 'musical-notes-outline', activeIcon: 'musical-notes' },
   { name: 'Settings', label: 'Settings', icon: 'settings-outline', activeIcon: 'settings' },
 ];
 
-const TAB_BAR_HEIGHT = 62;
-const MINI_PLAYER_HEIGHT = 80; // approximate height of mini player card
+const TAB_BAR_HEIGHT = 68;
 
 function CustomTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const song = usePlayerStore(selectCurrentSong);
   const rootNavigation = useNavigation<NavigationProp<RootStackParamList>>();
 
-  const miniPlayerVisible = !!song;
-
   return (
-    <View style={[styles.tabBarContainer, { paddingBottom: insets.bottom }]}>
-      {miniPlayerVisible && (
-        <MiniPlayer navigation={rootNavigation} />
-      )}
+    <View style={[styles.tabBarContainer, { paddingBottom: Math.max(insets.bottom, 4) }]}>
+      {!!song && <MiniPlayer navigation={rootNavigation} />}
       <View style={styles.tabBar}>
         {state.routes.map((route, index) => {
           const isFocused = state.index === index;
@@ -74,10 +69,13 @@ function CustomTabBar({ state, navigation }: BottomTabBarProps) {
               <View style={[styles.tabIconWrap, isFocused && styles.tabIconWrapActive]}>
                 <Ionicons
                   name={isFocused ? config.activeIcon : config.icon}
-                  size={22}
+                  size={21}
                   color={isFocused ? colors.accent : colors.subtle}
                 />
               </View>
+              <Text style={[styles.tabLabel, isFocused && styles.tabLabelActive]} numberOfLines={1}>
+                {config.label}
+              </Text>
             </TouchableOpacity>
           );
         })}
@@ -110,22 +108,32 @@ const styles = StyleSheet.create({
     height: TAB_BAR_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     height: TAB_BAR_HEIGHT,
+    gap: 3,
   },
   tabIconWrap: {
-    width: 44,
-    height: 38,
+    width: 42,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: 10,
   },
   tabIconWrapActive: {
-    backgroundColor: `${colors.accent}22`,
+    backgroundColor: `${colors.accent}20`,
+  },
+  tabLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: colors.subtle,
+    letterSpacing: 0.2,
+  },
+  tabLabelActive: {
+    color: colors.accent,
+    fontWeight: '700',
   },
 });
