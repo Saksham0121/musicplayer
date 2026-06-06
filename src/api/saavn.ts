@@ -1,4 +1,4 @@
-import { Song } from '../types/music';
+import { Album, Artist, Song } from '../types/music';
 
 const API_URL = 'https://saavn.sumit.co/api';
 
@@ -15,10 +15,27 @@ type RawSong = {
   duration?: string | number;
   language?: string;
   primaryArtists?: string;
-  album?: { name?: string };
+  album?: { name?: string; id?: string };
   artists?: { primary?: Array<{ name?: string }> };
   image?: RawMedia[];
   downloadUrl?: RawMedia[];
+};
+
+type RawArtist = {
+  id?: string;
+  name?: string;
+  image?: RawMedia[] | string;
+  followerCount?: string | number;
+};
+
+type RawAlbum = {
+  id?: string;
+  name?: string;
+  primaryArtists?: string;
+  artists?: string;
+  year?: string;
+  image?: RawMedia[];
+  songCount?: string | number;
 };
 
 type SearchResponse = {
@@ -30,7 +47,23 @@ type SearchResponse = {
   };
 };
 
-const decodeText = (value = '') =>
+type ArtistSearchResponse = {
+  status?: string;
+  data?: {
+    results?: RawArtist[];
+    total?: number;
+  };
+};
+
+type AlbumSearchResponse = {
+  status?: string;
+  data?: {
+    results?: RawAlbum[];
+    total?: number;
+  };
+};
+
+export const decodeText = (value = '') =>
   value
     .replace(/&quot;/g, '"')
     .replace(/&#039;/g, "'")
@@ -61,6 +94,42 @@ const normalizeSong = (song: RawSong): Song => ({
   audio: normalizeMedia(song.downloadUrl),
 });
 
+const pickArtistImage = (raw: RawArtist): string | undefined => {
+  if (Array.isArray(raw.image)) {
+    const sorted = [...raw.image].sort((a, b) => {
+      const qa = parseInt(a.quality ?? '0');
+      const qb = parseInt(b.quality ?? '0');
+      return qb - qa;
+    });
+    return sorted[0]?.url ?? sorted[0]?.link ?? undefined;
+  }
+  if (typeof raw.image === 'string') return raw.image;
+  return undefined;
+};
+
+const normalizeArtist = (raw: RawArtist): Artist => ({
+  id: raw.id ?? raw.name ?? '',
+  name: decodeText(raw.name ?? 'Unknown Artist'),
+  image: pickArtistImage(raw),
+});
+
+const normalizeAlbum = (raw: RawAlbum): Album => ({
+  id: raw.id ?? raw.name ?? '',
+  name: decodeText(raw.name ?? 'Unknown Album'),
+  artist: decodeText(raw.primaryArtists ?? raw.artists ?? 'Unknown Artist'),
+  year: raw.year,
+  image: raw.image
+    ? (() => {
+        const sorted = [...raw.image].sort((a, b) => {
+          const qa = parseInt(a.quality ?? '0');
+          const qb = parseInt(b.quality ?? '0');
+          return qb - qa;
+        });
+        return sorted[0]?.url ?? sorted[0]?.link ?? undefined;
+      })()
+    : undefined,
+});
+
 export async function searchSongs(query: string, page = 0, limit = 20) {
   const response = await fetch(
     `${API_URL}/search/songs?query=${encodeURIComponent(query)}&page=${page}&limit=${limit}`,
@@ -75,6 +144,42 @@ export async function searchSongs(query: string, page = 0, limit = 20) {
 
   return {
     songs: results.map(normalizeSong).filter((song) => song.audio.length > 0),
+    total: payload.data?.total ?? results.length,
+  };
+}
+
+export async function searchArtists(query: string, page = 0, limit = 15) {
+  const response = await fetch(
+    `${API_URL}/search/artists?query=${encodeURIComponent(query)}&page=${page}&limit=${limit}`,
+  );
+
+  if (!response.ok) {
+    throw new Error(`Music service returned ${response.status}`);
+  }
+
+  const payload = (await response.json()) as ArtistSearchResponse;
+  const results = payload.data?.results ?? [];
+
+  return {
+    artists: results.map(normalizeArtist).filter((a) => Boolean(a.name)),
+    total: payload.data?.total ?? results.length,
+  };
+}
+
+export async function searchAlbums(query: string, page = 0, limit = 20) {
+  const response = await fetch(
+    `${API_URL}/search/albums?query=${encodeURIComponent(query)}&page=${page}&limit=${limit}`,
+  );
+
+  if (!response.ok) {
+    throw new Error(`Music service returned ${response.status}`);
+  }
+
+  const payload = (await response.json()) as AlbumSearchResponse;
+  const results = payload.data?.results ?? [];
+
+  return {
+    albums: results.map(normalizeAlbum).filter((a) => Boolean(a.name)),
     total: payload.data?.total ?? results.length,
   };
 }
