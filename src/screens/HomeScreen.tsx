@@ -393,6 +393,7 @@ function SongsTab({
 }) {
   return (
     <FlatList
+      style={styles.flex}
       data={songs}
       keyExtractor={(item) => item.id}
       renderItem={({ item }) => (
@@ -451,6 +452,7 @@ function ArtistsTab({ artists, loading }: { artists: Artist[]; loading: boolean 
 
   return (
     <FlatList
+      style={styles.flex}
       data={artists}
       keyExtractor={(item) => item.id}
       contentContainerStyle={styles.artistsList}
@@ -490,6 +492,7 @@ function AlbumsTab({ albums, loading }: { albums: Album[]; loading: boolean }) {
 
   return (
     <FlatList
+      style={styles.flex}
       data={albums}
       keyExtractor={(item) => item.id}
       numColumns={2}
@@ -524,7 +527,7 @@ function FoldersTab() {
   const downloadedSongs = queue.filter((s) => s.localUri);
 
   return (
-    <ScrollView contentContainerStyle={styles.folderContent}>
+    <ScrollView style={styles.flex} contentContainerStyle={styles.folderContent}>
       <View style={styles.folderHeader}>
         <Ionicons name="folder-open" size={40} color={colors.accent} />
         <Text style={styles.folderTitle}>Downloaded Songs</Text>

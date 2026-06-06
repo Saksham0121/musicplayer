@@ -12,6 +12,7 @@ import { TabNavigator } from './src/navigation/TabNavigator';
 import { RootStackParamList } from './src/navigation/types';
 import { PlayerScreen } from './src/screens/PlayerScreen';
 import { QueueScreen } from './src/screens/QueueScreen';
+import { useLibraryStore } from './src/store/libraryStore';
 import { usePlayerStore } from './src/store/playerStore';
 import { colors } from './src/theme';
 
@@ -19,10 +20,12 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App() {
   const hydrate = usePlayerStore((state) => state.hydrate);
+  const hydrateLibrary = useLibraryStore((state) => state.hydrate);
 
   useEffect(() => {
     hydrate();
-  }, [hydrate]);
+    hydrateLibrary();
+  }, [hydrate, hydrateLibrary]);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

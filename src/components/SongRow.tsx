@@ -1,8 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import { downloadSong } from '../services/downloads';
+import { useLibraryStore } from '../store/libraryStore';
 import { usePlayerStore } from '../store/playerStore';
 import { colors, radius, spacing } from '../theme';
 import { Song } from '../types/music';
@@ -19,8 +29,17 @@ export function SongRow({ song, onPress, showQueueAction = true }: Props) {
   const addToQueue = usePlayerStore((state) => state.addToQueue);
   const markDownloaded = usePlayerStore((state) => state.markDownloaded);
   const localUri = usePlayerStore((state) => state.downloaded[song.id]);
+  const toggleFavorite = usePlayerStore((state) => state.toggleFavorite);
+  const favorites = usePlayerStore((state) => state.favorites);
+  const playlists = useLibraryStore((state) => state.playlists);
+  const addSongToPlaylist = useLibraryStore((state) => state.addSongToPlaylist);
+
   const [downloading, setDownloading] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const [showPlaylistPicker, setShowPlaylistPicker] = useState(false);
+
   const effectiveSong = localUri ? { ...song, localUri } : song;
+  const isFav = favorites.includes(song.id);
 
   const handleDownload = async () => {
     if (effectiveSong.localUri || downloading) return;
@@ -39,52 +58,175 @@ export function SongRow({ song, onPress, showQueueAction = true }: Props) {
   };
 
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-    >
-      <Artwork uri={pickImage(song, '150x150')} style={styles.artwork} radius={12} />
-      <View style={styles.copy}>
-        <Text style={styles.title} numberOfLines={1}>
-          {song.title}
-        </Text>
-        <Text style={styles.meta} numberOfLines={1}>
-          {song.artist}  ·  {formatTime(song.duration)}
-        </Text>
-      </View>
+    <>
       <Pressable
-        accessibilityLabel={effectiveSong.localUri ? 'Downloaded' : 'Download song'}
-        hitSlop={8}
-        onPress={(event) => {
-          event.stopPropagation();
-          void handleDownload();
-        }}
-        style={styles.iconButton}
+        onPress={onPress}
+        style={({ pressed }) => [styles.row, pressed && styles.pressed]}
       >
-        {downloading ? (
-          <ActivityIndicator size="small" color={colors.accent} />
-        ) : (
-          <Ionicons
-            name={effectiveSong.localUri ? 'checkmark-circle' : 'arrow-down-circle-outline'}
-            size={22}
-            color={effectiveSong.localUri ? colors.success : colors.muted}
-          />
-        )}
-      </Pressable>
-      {showQueueAction && (
+        <Artwork uri={pickImage(song, '150x150')} style={styles.artwork} radius={12} />
+        <View style={styles.copy}>
+          <Text style={styles.title} numberOfLines={1}>
+            {song.title}
+          </Text>
+          <Text style={styles.meta} numberOfLines={1}>
+            {song.artist}  ·  {formatTime(song.duration)}
+          </Text>
+        </View>
+
+        {/* Download */}
         <Pressable
-          accessibilityLabel="Add to queue"
+          accessibilityLabel={effectiveSong.localUri ? 'Downloaded' : 'Download song'}
           hitSlop={8}
           onPress={(event) => {
             event.stopPropagation();
-            addToQueue(song);
+            void handleDownload();
           }}
           style={styles.iconButton}
         >
-          <Ionicons name="add-circle-outline" size={23} color={colors.muted} />
+          {downloading ? (
+            <ActivityIndicator size="small" color={colors.accent} />
+          ) : (
+            <Ionicons
+              name={effectiveSong.localUri ? 'checkmark-circle' : 'arrow-down-circle-outline'}
+              size={22}
+              color={effectiveSong.localUri ? colors.success : colors.muted}
+            />
+          )}
         </Pressable>
-      )}
-    </Pressable>
+
+        {/* Options menu */}
+        <Pressable
+          accessibilityLabel="More options"
+          hitSlop={8}
+          onPress={(event) => {
+            event.stopPropagation();
+            setShowMenu(true);
+          }}
+          style={styles.iconButton}
+        >
+          <Ionicons name="ellipsis-vertical" size={20} color={colors.muted} />
+        </Pressable>
+      </Pressable>
+
+      {/* ── Options Menu Modal ────────────────────────────────────────── */}
+      <Modal
+        visible={showMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMenu(false)}
+        statusBarTranslucent
+      >
+        <Pressable style={styles.menuBackdrop} onPress={() => setShowMenu(false)}>
+          <Pressable style={styles.menuSheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.menuHandle} />
+            {/* Song info */}
+            <View style={styles.menuSongInfo}>
+              <Artwork uri={pickImage(song, '150x150')} style={styles.menuArtwork} radius={8} />
+              <View style={styles.menuSongText}>
+                <Text style={styles.menuSongTitle} numberOfLines={1}>{song.title}</Text>
+                <Text style={styles.menuSongArtist} numberOfLines={1}>{song.artist}</Text>
+              </View>
+            </View>
+            <View style={styles.menuDivider} />
+
+            {/* Actions */}
+            {[
+              {
+                icon: 'play-skip-forward-outline' as const,
+                label: 'Play Next',
+                onPress: () => { addToQueue(song); setShowMenu(false); },
+              },
+              {
+                icon: 'add-circle-outline' as const,
+                label: 'Add to Queue',
+                onPress: () => { addToQueue(song); setShowMenu(false); },
+              },
+              {
+                icon: isFav ? 'heart' as const : 'heart-outline' as const,
+                label: isFav ? 'Remove from Favourites' : 'Add to Favourites',
+                accent: isFav,
+                onPress: () => { toggleFavorite(song.id); setShowMenu(false); },
+              },
+              {
+                icon: 'list-outline' as const,
+                label: 'Add to Playlist',
+                onPress: () => { setShowMenu(false); setTimeout(() => setShowPlaylistPicker(true), 200); },
+              },
+              {
+                icon: effectiveSong.localUri ? 'checkmark-circle' as const : 'arrow-down-circle-outline' as const,
+                label: effectiveSong.localUri ? 'Downloaded' : 'Download',
+                accent: !!effectiveSong.localUri,
+                onPress: () => { void handleDownload(); setShowMenu(false); },
+              },
+            ].map((action) => (
+              <Pressable
+                key={action.label}
+                style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
+                onPress={action.onPress}
+              >
+                <Ionicons
+                  name={action.icon}
+                  size={20}
+                  color={action.accent ? colors.accent : colors.muted}
+                />
+                <Text style={[styles.menuItemText, action.accent && styles.menuItemAccent]}>
+                  {action.label}
+                </Text>
+              </Pressable>
+            ))}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ── Playlist Picker Modal ─────────────────────────────────────── */}
+      <Modal
+        visible={showPlaylistPicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPlaylistPicker(false)}
+        statusBarTranslucent
+      >
+        <Pressable style={styles.menuBackdrop} onPress={() => setShowPlaylistPicker(false)}>
+          <Pressable style={styles.menuSheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.menuHandle} />
+            <Text style={styles.pickerHeading}>Add to Playlist</Text>
+            {playlists.length === 0 ? (
+              <View style={styles.pickerEmpty}>
+                <Ionicons name="list-outline" size={32} color={colors.subtle} />
+                <Text style={styles.pickerEmptyText}>No playlists yet. Create one first!</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={playlists}
+                keyExtractor={(p) => p.id}
+                style={{ maxHeight: 320 }}
+                renderItem={({ item }) => (
+                  <Pressable
+                    style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
+                    onPress={() => {
+                      addSongToPlaylist(item.id, song);
+                      setShowPlaylistPicker(false);
+                      Alert.alert('Added', `"${song.title}" added to "${item.name}"`);
+                    }}
+                  >
+                    <View style={styles.pickerPlaylistIcon}>
+                      <Ionicons name="musical-notes" size={16} color={colors.accent} />
+                    </View>
+                    <View style={styles.pickerPlaylistInfo}>
+                      <Text style={styles.menuItemText}>{item.name}</Text>
+                      <Text style={styles.pickerPlaylistCount}>{item.songs.length} songs</Text>
+                    </View>
+                    {item.songs.some((s) => s.id === song.id) && (
+                      <Ionicons name="checkmark" size={18} color={colors.accent} />
+                    )}
+                  </Pressable>
+                )}
+              />
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
   );
 }
 
@@ -108,4 +250,72 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Menu modal
+  menuBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  menuSheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    paddingTop: spacing.md,
+    paddingBottom: 36,
+    paddingHorizontal: spacing.xl,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  menuHandle: {
+    width: 38,
+    height: 4,
+    backgroundColor: colors.border,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: spacing.lg,
+  },
+  menuSongInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    gap: spacing.md,
+  },
+  menuArtwork: { width: 46, height: 46 },
+  menuSongText: { flex: 1 },
+  menuSongTitle: { color: colors.text, fontSize: 15, fontWeight: '700' },
+  menuSongArtist: { color: colors.muted, fontSize: 12, marginTop: 2 },
+  menuDivider: { height: 1, backgroundColor: colors.border, marginBottom: spacing.md },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    gap: spacing.md,
+  },
+  menuItemPressed: { backgroundColor: colors.surfaceElevated },
+  menuItemText: { flex: 1, color: colors.text, fontSize: 15, fontWeight: '600' },
+  menuItemAccent: { color: colors.accent },
+  pickerHeading: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: spacing.md,
+  },
+  pickerEmpty: {
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
+    gap: spacing.md,
+  },
+  pickerEmptyText: { color: colors.muted, fontSize: 14, textAlign: 'center' },
+  pickerPlaylistIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: `${colors.accent}20`,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickerPlaylistInfo: { flex: 1 },
+  pickerPlaylistCount: { color: colors.muted, fontSize: 12, marginTop: 2 },
 });
