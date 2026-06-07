@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Artwork } from './Artwork';
-import { colors, spacing } from '../theme';
+import { createThemeStyles, darkColors, spacing } from '../theme';
 import { Artist } from '../types/music';
 
 type Props = {
@@ -29,22 +29,22 @@ export function ArtistCard({ artist, onPress, size = 90 }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createThemeStyles((themeColors) => ({
   card: {
     alignItems: 'center',
     marginRight: spacing.md,
   },
   avatarWrap: {
     overflow: 'hidden',
-    backgroundColor: colors.surface,
+    backgroundColor: themeColors.surface,
     borderWidth: 2,
-    borderColor: colors.border,
+    borderColor: themeColors.border,
     marginBottom: spacing.sm,
   },
   name: {
-    color: colors.text,
+    color: themeColors.text,
     fontSize: 12,
     fontWeight: '700',
     textAlign: 'center',
   },
-});
+}));

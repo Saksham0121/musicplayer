@@ -14,7 +14,7 @@ import {
 import { downloadSong } from '../services/downloads';
 import { useLibraryStore } from '../store/libraryStore';
 import { usePlayerStore } from '../store/playerStore';
-import { colors, radius, spacing } from '../theme';
+import { colors, createThemeStyles, radius, spacing } from '../theme';
 import { Song } from '../types/music';
 import { formatTime, pickImage } from '../utils/music';
 import { Artwork } from './Artwork';
@@ -39,7 +39,7 @@ export function SongRow({ song, onPress, showQueueAction = true }: Props) {
   const [showPlaylistPicker, setShowPlaylistPicker] = useState(false);
 
   const effectiveSong = localUri ? { ...song, localUri } : song;
-  const isFav = favorites.includes(song.id);
+  const isFav = favorites.some((s) => s.id === song.id);
 
   const handleDownload = async () => {
     if (effectiveSong.localUri || downloading) return;
@@ -145,7 +145,7 @@ export function SongRow({ song, onPress, showQueueAction = true }: Props) {
                 icon: isFav ? 'heart' as const : 'heart-outline' as const,
                 label: isFav ? 'Remove from Favourites' : 'Add to Favourites',
                 accent: isFav,
-                onPress: () => { toggleFavorite(song.id); setShowMenu(false); },
+                onPress: () => { toggleFavorite(song); setShowMenu(false); },
               },
               {
                 icon: 'list-outline' as const,
@@ -230,7 +230,7 @@ export function SongRow({ song, onPress, showQueueAction = true }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createThemeStyles((themeColors) => ({
   row: {
     minHeight: 74,
     flexDirection: 'row',
@@ -239,11 +239,11 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: radius.md,
   },
-  pressed: { backgroundColor: colors.surface },
+  pressed: { backgroundColor: themeColors.surface },
   artwork: { width: 54, height: 54 },
   copy: { flex: 1, paddingHorizontal: spacing.md },
-  title: { color: colors.text, fontSize: 15, fontWeight: '700' },
-  meta: { color: colors.muted, fontSize: 12, marginTop: 5 },
+  title: { color: themeColors.text, fontSize: 15, fontWeight: '700' },
+  meta: { color: themeColors.muted, fontSize: 12, marginTop: 5 },
   iconButton: {
     width: 34,
     height: 38,
@@ -257,19 +257,19 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   menuSheet: {
-    backgroundColor: colors.surface,
+    backgroundColor: themeColors.surface,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
     paddingTop: spacing.md,
     paddingBottom: 36,
     paddingHorizontal: spacing.xl,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: themeColors.border,
   },
   menuHandle: {
     width: 38,
     height: 4,
-    backgroundColor: colors.border,
+    backgroundColor: themeColors.border,
     borderRadius: 2,
     alignSelf: 'center',
     marginBottom: spacing.lg,
@@ -282,9 +282,9 @@ const styles = StyleSheet.create({
   },
   menuArtwork: { width: 46, height: 46 },
   menuSongText: { flex: 1 },
-  menuSongTitle: { color: colors.text, fontSize: 15, fontWeight: '700' },
-  menuSongArtist: { color: colors.muted, fontSize: 12, marginTop: 2 },
-  menuDivider: { height: 1, backgroundColor: colors.border, marginBottom: spacing.md },
+  menuSongTitle: { color: themeColors.text, fontSize: 15, fontWeight: '700' },
+  menuSongArtist: { color: themeColors.muted, fontSize: 12, marginTop: 2 },
+  menuDivider: { height: 1, backgroundColor: themeColors.border, marginBottom: spacing.md },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -293,11 +293,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     gap: spacing.md,
   },
-  menuItemPressed: { backgroundColor: colors.surfaceElevated },
-  menuItemText: { flex: 1, color: colors.text, fontSize: 15, fontWeight: '600' },
-  menuItemAccent: { color: colors.accent },
+  menuItemPressed: { backgroundColor: themeColors.surfaceElevated },
+  menuItemText: { flex: 1, color: themeColors.text, fontSize: 15, fontWeight: '600' },
+  menuItemAccent: { color: themeColors.accent },
   pickerHeading: {
-    color: colors.text,
+    color: themeColors.text,
     fontSize: 18,
     fontWeight: '800',
     marginBottom: spacing.md,
@@ -307,15 +307,15 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xl,
     gap: spacing.md,
   },
-  pickerEmptyText: { color: colors.muted, fontSize: 14, textAlign: 'center' },
+  pickerEmptyText: { color: themeColors.muted, fontSize: 14, textAlign: 'center' },
   pickerPlaylistIcon: {
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: `${colors.accent}20`,
+    backgroundColor: `${themeColors.accent}20`,
     alignItems: 'center',
     justifyContent: 'center',
   },
   pickerPlaylistInfo: { flex: 1 },
-  pickerPlaylistCount: { color: colors.muted, fontSize: 12, marginTop: 2 },
-});
+  pickerPlaylistCount: { color: themeColors.muted, fontSize: 12, marginTop: 2 },
+}));

@@ -8,9 +8,14 @@ export const pickImage = (song?: Song, preferred = '500x500') => {
   );
 };
 
-export const pickAudio = (song?: Song) => {
+export const pickAudio = (song?: Song, preferredQuality = '320kbps') => {
   if (!song) return undefined;
-  return song.localUri ?? song.audio.find((item) => item.quality === '320kbps')?.url ?? song.audio.at(-1)?.url;
+  return (
+    song.localUri ??
+    song.audio.find((item) => item.quality === preferredQuality)?.url ??
+    song.audio.find((item) => item.quality === '320kbps')?.url ??
+    song.audio.at(-1)?.url
+  );
 };
 
 export const formatTime = (seconds = 0) => {

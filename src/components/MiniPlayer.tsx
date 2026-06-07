@@ -6,7 +6,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAudioControls } from '../audio/AudioProvider';
 import { RootStackParamList } from '../navigation/types';
 import { selectCurrentSong, usePlayerStore } from '../store/playerStore';
-import { colors, radius, spacing } from '../theme';
+import { colors, createThemeStyles, darkColors, radius, spacing } from '../theme';
 import { pickImage } from '../utils/music';
 import { Artwork } from './Artwork';
 
@@ -55,18 +55,18 @@ export function MiniPlayer({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createThemeStyles((themeColors) => ({
   wrap: {
     marginHorizontal: spacing.md,
     marginBottom: spacing.sm,
-    backgroundColor: '#242429F5',
+    backgroundColor: themeColors.surface === '#FFFFFF' ? 'rgba(255,255,255,0.96)' : '#242429F5',
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: '#383840',
+    borderColor: themeColors.surface === '#FFFFFF' ? 'rgba(0,0,0,0.08)' : '#383840',
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
+    shadowOpacity: themeColors.surface === '#FFFFFF' ? 0.08 : 0.35,
     shadowRadius: 18,
     elevation: 12,
   },
@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
   },
   artwork: { width: 52, height: 52 },
   copy: { flex: 1, paddingHorizontal: spacing.md },
-  title: { color: colors.text, fontWeight: '700', fontSize: 14 },
-  artist: { color: colors.muted, fontSize: 12, marginTop: 4 },
+  title: { color: themeColors.text, fontWeight: '700', fontSize: 14 },
+  artist: { color: themeColors.muted, fontSize: 12, marginTop: 4 },
   control: { width: 42, height: 48, alignItems: 'center', justifyContent: 'center' },
-});
+}));

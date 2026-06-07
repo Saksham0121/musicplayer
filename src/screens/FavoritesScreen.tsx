@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Artwork } from '../components/Artwork';
 import { RootStackParamList } from '../navigation/types';
 import { usePlayerStore } from '../store/playerStore';
-import { colors, radius, spacing } from '../theme';
+import { createThemeStyles, darkColors, lightColors, radius, spacing } from '../theme';
 import { Song } from '../types/music';
 import { formatTime, pickImage } from '../utils/music';
 
@@ -17,17 +17,10 @@ export function FavoritesScreen() {
   const recentlyPlayed = usePlayerStore((state) => state.recentlyPlayed);
   const playSong = usePlayerStore((state) => state.playSong);
   const toggleFavorite = usePlayerStore((state) => state.toggleFavorite);
+  const theme = usePlayerStore((state) => state.theme);
 
-  // Collect favorited songs from recently played and queue (deduped)
-  const allKnownSongs = [
-    ...recentlyPlayed,
-    ...queue,
-  ].reduce<Song[]>((acc, song) => {
-    if (!acc.some((s) => s.id === song.id)) acc.push(song);
-    return acc;
-  }, []);
-
-  const favoriteSongs = allKnownSongs.filter((song) => favorites.includes(song.id));
+  const favoriteSongs = favorites;
+  const themeColors = theme === 'dark' ? darkColors : lightColors;
 
   const play = (song: Song) => {
     playSong(song, favoriteSongs);
@@ -39,7 +32,7 @@ export function FavoritesScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerIcon}>
-          <Ionicons name="heart" size={24} color={colors.accent} />
+          <Ionicons name="heart" size={24} color={themeColors.accent} />
         </View>
         <View style={styles.headerText}>
           <Text style={styles.heading}>Favourites</Text>
@@ -53,7 +46,7 @@ export function FavoritesScreen() {
             style={styles.playAllButton}
             onPress={() => favoriteSongs[0] && play(favoriteSongs[0])}
           >
-            <Ionicons name="play" size={18} color={colors.white} style={{ marginLeft: 2 }} />
+            <Ionicons name="play" size={18} color={themeColors.white} style={{ marginLeft: 2 }} />
             <Text style={styles.playAllText}>Play All</Text>
           </Pressable>
           <Pressable
@@ -64,7 +57,7 @@ export function FavoritesScreen() {
               if (random) play(random);
             }}
           >
-            <Ionicons name="shuffle" size={18} color={colors.accent} />
+            <Ionicons name="shuffle" size={18} color={themeColors.accent} />
             <Text style={styles.shuffleText}>Shuffle</Text>
           </Pressable>
         </View>
@@ -84,17 +77,17 @@ export function FavoritesScreen() {
             <Text style={styles.duration}>{formatTime(item.duration)}</Text>
             <Pressable
               hitSlop={10}
-              onPress={() => toggleFavorite(item.id)}
+              onPress={() => toggleFavorite(item)}
               style={styles.heartButton}
             >
-              <Ionicons name="heart" size={22} color={colors.accent} />
+              <Ionicons name="heart" size={22} color={themeColors.accent} />
             </Pressable>
           </Pressable>
         )}
         ListEmptyComponent={
           <View style={styles.empty}>
             <View style={styles.emptyIcon}>
-              <Ionicons name="heart-outline" size={40} color={colors.accent} />
+              <Ionicons name="heart-outline" size={40} color={themeColors.accent} />
             </View>
             <Text style={styles.emptyTitle}>No favourites yet</Text>
             <Text style={styles.emptyCopy}>
@@ -107,7 +100,7 @@ export function FavoritesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createThemeStyles((colors) => ({
   safe: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
@@ -199,4 +192,4 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginTop: spacing.md,
   },
-});
+}));

@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -24,11 +26,29 @@ import { SORT_LABELS, SortPicker } from '../components/SortPicker';
 import { SongRow } from '../components/SongRow';
 import { RootStackParamList } from '../navigation/types';
 import { usePlayerStore } from '../store/playerStore';
-import { colors, radius, spacing } from '../theme';
+import { createThemeStyles, darkColors, lightColors, radius, spacing } from '../theme';
 import { Album, Artist, Song, SortOption } from '../types/music';
 import { formatTime, pickImage } from '../utils/music';
 
 const DEFAULT_QUERY = 'Bollywood hits';
+
+const TRENDING_ARTISTS: Artist[] = [
+  {
+    id: 'trending-arijit-singh',
+    name: 'Arijit Singh',
+    image: 'https://c.saavncdn.com/artists/Arijit_Singh_004_20241118063717_500x500.jpg',
+  },
+  {
+    id: 'trending-diljit-dosanjh',
+    name: 'Diljit Dosanjh',
+    image: 'https://c.saavncdn.com/artists/Diljit_Dosanjh_005_20231025073054_500x500.jpg',
+  },
+  {
+    id: 'trending-taylor-swift',
+    name: 'Taylor Swift',
+    image: 'https://c.saavncdn.com/artists/Taylor_Swift_003_20200226074119_500x500.jpg',
+  },
+];
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -56,8 +76,23 @@ function sortSongs(songs: Song[], option: SortOption): Song[] {
   }
 }
 
+function deduplicateSongs(list: Song[]): Song[] {
+  const seenKey = new Set<string>();
+  const seenId = new Set<string>();
+  return list.filter((song) => {
+    const key = `${song.title.trim().toLowerCase()}-${song.artist.trim().toLowerCase()}`;
+    if (seenKey.has(key) || seenId.has(song.id)) return false;
+    seenKey.add(key);
+    seenId.add(song.id);
+    return true;
+  });
+}
+
 // ─── Section Header ──────────────────────────────────────────────────────────
 function SectionHeader({ title, onSeeAll }: { title: string; onSeeAll?: () => void }) {
+  const theme = usePlayerStore((s) => s.theme);
+  const themeColors = theme === 'dark' ? darkColors : lightColors;
+
   return (
     <View style={sectionStyles.row}>
       <Text style={sectionStyles.title}>{title}</Text>
@@ -70,7 +105,7 @@ function SectionHeader({ title, onSeeAll }: { title: string; onSeeAll?: () => vo
   );
 }
 
-const sectionStyles = StyleSheet.create({
+const sectionStyles = createThemeStyles((colors) => ({
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -81,7 +116,7 @@ const sectionStyles = StyleSheet.create({
   },
   title: { color: colors.text, fontSize: 18, fontWeight: '800' },
   seeAll: { color: colors.accent, fontSize: 13, fontWeight: '700' },
-});
+}));
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export function HomeScreen() {
@@ -89,8 +124,8 @@ export function HomeScreen() {
 
   const recentlyPlayed = usePlayerStore((s) => s.recentlyPlayed);
   const playSong = usePlayerStore((s) => s.playSong);
-  const toggleFavorite = usePlayerStore((s) => s.toggleFavorite);
-  const favorites = usePlayerStore((s) => s.favorites);
+  const theme = usePlayerStore((s) => s.theme);
+  const themeColors = theme === 'dark' ? darkColors : lightColors;
 
   // ── Category tab ─────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<CategoryTabId>('Suggested');
@@ -115,26 +150,42 @@ export function HomeScreen() {
   const [sortOption, setSortOption] = useState<SortOption>('asc');
   const [showSort, setShowSort] = useState(false);
 
+  const latestQueryRef = useRef(DEFAULT_QUERY);
+
   const loadSongs = useCallback(async (q: string, p: number) => {
     p === 0 ? setLoadingSongs(true) : setLoadingMore(true);
     try {
       const result = await searchSongs(q, p);
-      setSongs((prev) =>
-        p === 0
-          ? result.songs
-          : [...prev, ...result.songs.filter((s) => !prev.some((ps) => ps.id === s.id))],
-      );
+      if (q !== latestQueryRef.current) return;
+      setSongs((prev) => {
+        const combined = p === 0 ? result.songs : [...prev, ...result.songs];
+        return deduplicateSongs(combined);
+      });
       setTotal(result.total);
       setPage(p);
     } catch {
       // swallow
     } finally {
-      setLoadingSongs(false);
-      setLoadingMore(false);
+      if (q === latestQueryRef.current) {
+        setLoadingSongs(false);
+        setLoadingMore(false);
+      }
     }
   }, []);
 
-  useEffect(() => { void loadSongs(query, 0); }, [loadSongs, query]);
+  useEffect(() => {
+    latestQueryRef.current = query;
+    void loadSongs(query, 0);
+  }, [loadSongs, query]);
+
+  useEffect(() => {
+    songs.slice(0, 200).forEach((song) => {
+      const uri = pickImage(song, '150x150');
+      if (uri) {
+        Image.prefetch(uri).catch(() => { });
+      }
+    });
+  }, [songs]);
 
   const sortedSongs = useMemo(() => sortSongs(songs, sortOption), [songs, sortOption]);
 
@@ -161,17 +212,12 @@ export function HomeScreen() {
     if (activeTab === 'Artists') void loadArtists(query);
   }, [activeTab, query, loadArtists]);
 
-  // Load artists for Suggested tab too (separate quiet load)
-  const [suggestedArtists, setSuggestedArtists] = useState<Artist[]>([]);
-  const suggestedArtistsLoadedFor = useRef('');
-
-  useEffect(() => {
-    if (suggestedArtistsLoadedFor.current === query) return;
-    void searchArtists(query, 0, 8).then((r) => {
-      setSuggestedArtists(r.artists);
-      suggestedArtistsLoadedFor.current = query;
-    }).catch(() => {});
-  }, [query]);
+  const handleArtistClick = (artistName: string) => {
+    setInput(artistName);
+    setQuery(artistName);
+    setActiveTab('Songs');
+    setShowSearch(true);
+  };
 
   // ── Albums ───────────────────────────────────────────────────────────
   const [albums, setAlbums] = useState<Album[]>([]);
@@ -208,7 +254,7 @@ export function HomeScreen() {
       {/* ─── App Bar ─────────────────────────────────────────────── */}
       <View style={styles.appBar}>
         <View style={styles.logoRow}>
-          <Ionicons name="musical-notes" size={26} color={colors.accent} />
+          <Ionicons name="musical-notes" size={26} color={themeColors.accent} />
           <View>
             <Text style={styles.logoText}>Mume</Text>
             <Text style={styles.greeting}>{getGreeting()}</Text>
@@ -223,14 +269,14 @@ export function HomeScreen() {
             }}
             accessibilityLabel="Search"
           >
-            <Ionicons name={showSearch ? 'close' : 'search'} size={22} color={colors.text} />
+            <Ionicons name={showSearch ? 'close' : 'search'} size={22} color={themeColors.text} />
           </Pressable>
           <Pressable
             style={styles.iconBtn}
             onPress={() => navigation.navigate('Queue')}
             accessibilityLabel="Queue"
           >
-            <Ionicons name="list" size={22} color={colors.text} />
+            <Ionicons name="list" size={22} color={themeColors.text} />
           </Pressable>
         </View>
       </View>
@@ -238,19 +284,19 @@ export function HomeScreen() {
       {/* ─── Search bar ────────────────────────────────────────────── */}
       {showSearch && (
         <View style={styles.searchBar}>
-          <Ionicons name="search" size={18} color={colors.muted} />
+          <Ionicons name="search" size={18} color={themeColors.muted} />
           <TextInput
             ref={searchRef}
             value={input}
             onChangeText={setInput}
             placeholder="Songs, artists, albums…"
-            placeholderTextColor={colors.subtle}
+            placeholderTextColor={themeColors.subtle}
             style={styles.searchInput}
             returnKeyType="search"
           />
           {input.length > 0 && (
             <Pressable onPress={() => setInput('')} hitSlop={8}>
-              <Ionicons name="close-circle" size={18} color={colors.muted} />
+              <Ionicons name="close-circle" size={18} color={themeColors.muted} />
             </Pressable>
           )}
         </View>
@@ -264,9 +310,9 @@ export function HomeScreen() {
         <SuggestedTab
           recentlyPlayed={recentlyPlayed}
           songs={songs}
-          artists={suggestedArtists}
           loading={loadingSongs}
           onPlay={(s) => play(s, songs)}
+          onArtistPress={handleArtistClick}
         />
       )}
 
@@ -283,13 +329,15 @@ export function HomeScreen() {
             if (!loadingMore && songs.length < total) void loadSongs(query, page + 1);
           }}
           onRefresh={() => void loadSongs(query, 0)}
-          favorites={favorites}
-          onToggleFavorite={toggleFavorite}
         />
       )}
 
       {activeTab === 'Artists' && (
-        <ArtistsTab artists={artists} loading={loadingArtists} />
+        <ArtistsTab
+          artists={artists}
+          loading={loadingArtists}
+          onArtistPress={handleArtistClick}
+        />
       )}
 
       {activeTab === 'Albums' && (
@@ -313,22 +361,24 @@ export function HomeScreen() {
 function SuggestedTab({
   recentlyPlayed,
   songs,
-  artists,
   loading,
   onPlay,
+  onArtistPress,
 }: {
   recentlyPlayed: Song[];
   songs: Song[];
-  artists: Artist[];
   loading: boolean;
   onPlay: (s: Song) => void;
+  onArtistPress: (name: string) => void;
 }) {
+  const theme = usePlayerStore((s) => s.theme);
+  const themeColors = theme === 'dark' ? darkColors : lightColors;
   const topPicks = songs.slice(0, 8);
 
   if (loading && songs.length === 0) {
     return (
       <View style={styles.loader}>
-        <ActivityIndicator color={colors.accent} size="large" />
+        <ActivityIndicator color={themeColors.accent} size="large" />
       </View>
     );
   }
@@ -351,17 +401,20 @@ function SuggestedTab({
         </>
       )}
 
-      {/* Artists */}
-      {artists.length > 0 && (
-        <>
-          <SectionHeader title="Artists" />
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hScroll}>
-            {artists.map((artist) => (
-              <ArtistCard key={artist.id} artist={artist} size={88} />
-            ))}
-          </ScrollView>
-        </>
-      )}
+      {/* Trending Artists */}
+      <>
+        <SectionHeader title="Trending Artists" />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hScroll}>
+          {TRENDING_ARTISTS.map((artist) => (
+            <ArtistCard
+              key={artist.id}
+              artist={artist}
+              size={88}
+              onPress={() => onArtistPress(artist.name)}
+            />
+          ))}
+        </ScrollView>
+      </>
 
       {/* Top Picks */}
       {topPicks.length > 0 && (
@@ -377,7 +430,7 @@ function SuggestedTab({
 
       {recentlyPlayed.length === 0 && songs.length === 0 && (
         <View style={styles.emptyCenter}>
-          <Ionicons name="musical-note-outline" size={48} color={colors.subtle} />
+          <Ionicons name="musical-note-outline" size={48} color={themeColors.subtle} />
           <Text style={styles.emptyTitle}>Play some songs to get started</Text>
         </View>
       )}
@@ -396,8 +449,6 @@ function SongsTab({
   onPlay,
   onEndReached,
   onRefresh,
-  favorites,
-  onToggleFavorite,
 }: {
   songs: Song[];
   total: number;
@@ -408,14 +459,15 @@ function SongsTab({
   onPlay: (s: Song) => void;
   onEndReached: () => void;
   onRefresh: () => void;
-  favorites: string[];
-  onToggleFavorite: (id: string) => void;
 }) {
+  const theme = usePlayerStore((s) => s.theme);
+  const themeColors = theme === 'dark' ? darkColors : lightColors;
+
   return (
     <FlatList
       style={styles.flex}
       data={songs}
-      keyExtractor={(item) => item.id}
+      keyExtractor={(item, index) => `${item.id}-${index}`}
       renderItem={({ item }) => (
         <SongRow
           song={item}
@@ -429,7 +481,7 @@ function SongsTab({
         <RefreshControl
           refreshing={loading && songs.length > 0}
           onRefresh={onRefresh}
-          tintColor={colors.accent}
+          tintColor={themeColors.accent}
         />
       }
       ListHeaderComponent={
@@ -440,32 +492,43 @@ function SongsTab({
             <Ionicons
               name={sortOption === 'desc' ? 'arrow-down' : 'arrow-up'}
               size={14}
-              color={colors.accent}
+              color={themeColors.accent}
             />
           </Pressable>
         </View>
       }
       ListEmptyComponent={
         loading ? (
-          <ActivityIndicator color={colors.accent} size="large" style={styles.listLoader} />
+          <ActivityIndicator color={themeColors.accent} size="large" style={styles.listLoader} />
         ) : (
           <View style={styles.emptyCenter}>
-            <Ionicons name="musical-note-outline" size={40} color={colors.subtle} />
+            <Ionicons name="musical-note-outline" size={40} color={themeColors.subtle} />
             <Text style={styles.emptyTitle}>No songs found</Text>
           </View>
         )
       }
-      ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.accent} style={styles.footer} /> : null}
+      ListFooterComponent={loadingMore ? <ActivityIndicator color={themeColors.accent} style={styles.footer} /> : null}
     />
   );
 }
 
 // ─── Artists Tab ──────────────────────────────────────────────────────────────
-function ArtistsTab({ artists, loading }: { artists: Artist[]; loading: boolean }) {
+function ArtistsTab({
+  artists,
+  loading,
+  onArtistPress,
+}: {
+  artists: Artist[];
+  loading: boolean;
+  onArtistPress: (name: string) => void;
+}) {
+  const theme = usePlayerStore((s) => s.theme);
+  const themeColors = theme === 'dark' ? darkColors : lightColors;
+
   if (loading) {
     return (
       <View style={styles.loader}>
-        <ActivityIndicator color={colors.accent} size="large" />
+        <ActivityIndicator color={themeColors.accent} size="large" />
       </View>
     );
   }
@@ -477,7 +540,10 @@ function ArtistsTab({ artists, loading }: { artists: Artist[]; loading: boolean 
       keyExtractor={(item) => item.id}
       contentContainerStyle={styles.artistsList}
       renderItem={({ item }) => (
-        <View style={styles.artistRow}>
+        <Pressable
+          style={({ pressed }) => [styles.artistRow, pressed && { backgroundColor: themeColors.surface }]}
+          onPress={() => onArtistPress(item.name)}
+        >
           <Artwork
             uri={item.image}
             style={styles.artistAvatar}
@@ -487,12 +553,12 @@ function ArtistsTab({ artists, loading }: { artists: Artist[]; loading: boolean 
           <View style={styles.artistInfo}>
             <Text style={styles.artistName} numberOfLines={1}>{item.name}</Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.subtle} />
-        </View>
+          <Ionicons name="chevron-forward" size={18} color={themeColors.subtle} />
+        </Pressable>
       )}
       ListEmptyComponent={
         <View style={styles.emptyCenter}>
-          <Ionicons name="person-outline" size={40} color={colors.subtle} />
+          <Ionicons name="person-outline" size={40} color={themeColors.subtle} />
           <Text style={styles.emptyTitle}>No artists found</Text>
         </View>
       }
@@ -502,10 +568,13 @@ function ArtistsTab({ artists, loading }: { artists: Artist[]; loading: boolean 
 
 // ─── Albums Tab ───────────────────────────────────────────────────────────────
 function AlbumsTab({ albums, loading }: { albums: Album[]; loading: boolean }) {
+  const theme = usePlayerStore((s) => s.theme);
+  const themeColors = theme === 'dark' ? darkColors : lightColors;
+
   if (loading) {
     return (
       <View style={styles.loader}>
-        <ActivityIndicator color={colors.accent} size="large" />
+        <ActivityIndicator color={themeColors.accent} size="large" />
       </View>
     );
   }
@@ -532,7 +601,7 @@ function AlbumsTab({ albums, loading }: { albums: Album[]; loading: boolean }) {
       )}
       ListEmptyComponent={
         <View style={styles.emptyCenter}>
-          <Ionicons name="albums-outline" size={40} color={colors.subtle} />
+          <Ionicons name="albums-outline" size={40} color={themeColors.subtle} />
           <Text style={styles.emptyTitle}>No albums found</Text>
         </View>
       }
@@ -544,12 +613,32 @@ function AlbumsTab({ albums, loading }: { albums: Album[]; loading: boolean }) {
 function FoldersTab() {
   const downloaded = usePlayerStore((s) => s.downloaded);
   const queue = usePlayerStore((s) => s.queue);
-  const downloadedSongs = queue.filter((s) => s.localUri);
+  const recentlyPlayed = usePlayerStore((s) => s.recentlyPlayed);
+  const favorites = usePlayerStore((s) => s.favorites);
+  const theme = usePlayerStore((s) => s.theme);
+  const themeColors = theme === 'dark' ? darkColors : lightColors;
+
+  const downloadedSongs = useMemo(() => {
+    const allSongs = [...queue, ...recentlyPlayed, ...favorites];
+    const uniqueSongs = allSongs.reduce<Song[]>((acc, song) => {
+      if (!acc.some((s) => s.id === song.id)) {
+        acc.push(song);
+      }
+      return acc;
+    }, []);
+
+    return uniqueSongs
+      .filter((song) => !!downloaded[song.id])
+      .map((song) => ({
+        ...song,
+        localUri: downloaded[song.id],
+      }));
+  }, [queue, recentlyPlayed, favorites, downloaded]);
 
   return (
     <ScrollView style={styles.flex} contentContainerStyle={styles.folderContent}>
       <View style={styles.folderHeader}>
-        <Ionicons name="folder-open" size={40} color={colors.accent} />
+        <Ionicons name="folder-open" size={40} color={themeColors.accent} />
         <Text style={styles.folderTitle}>Downloaded Songs</Text>
         <Text style={styles.folderSub}>{downloadedSongs.length} songs available offline</Text>
       </View>
@@ -577,7 +666,7 @@ function FoldersTab() {
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-const styles = StyleSheet.create({
+const styles = createThemeStyles((colors) => ({
   safe: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
 
@@ -618,7 +707,16 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     gap: spacing.sm,
   },
-  searchInput: { flex: 1, color: colors.text, fontSize: 14 },
+  searchInput: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 14,
+    ...Platform.select({
+      web: {
+        outlineStyle: 'none',
+      } as any,
+    }),
+  },
 
   // Suggested tab
   suggestedContent: { paddingBottom: 160 },
@@ -703,4 +801,4 @@ const styles = StyleSheet.create({
   emptyCenter: { alignItems: 'center', paddingTop: 80, paddingHorizontal: 40 },
   emptyTitle: { color: colors.muted, fontSize: 16, fontWeight: '700', marginTop: spacing.lg },
   emptyCopy: { color: colors.muted, fontSize: 14, textAlign: 'center', lineHeight: 22, marginTop: spacing.md },
-});
+}));

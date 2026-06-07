@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Artwork } from './Artwork';
-import { colors, radius, spacing } from '../theme';
+import { createThemeStyles, darkColors, radius, spacing } from '../theme';
 import { Song } from '../types/music';
 import { formatTime, pickImage } from '../utils/music';
 
@@ -36,14 +36,14 @@ export function HorizontalSongCard({ song, onPress, width = 140 }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createThemeStyles((themeColors) => ({
   card: {
     marginRight: spacing.md,
   },
   artworkWrap: {
     borderRadius: radius.md,
     overflow: 'hidden',
-    backgroundColor: colors.surface,
+    backgroundColor: themeColors.surface,
     marginBottom: spacing.sm,
   },
   duration: {
@@ -56,18 +56,18 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   durationText: {
-    color: colors.white,
+    color: themeColors.white,
     fontSize: 10,
     fontWeight: '600',
   },
   title: {
-    color: colors.text,
+    color: themeColors.text,
     fontSize: 13,
     fontWeight: '700',
   },
   artist: {
-    color: colors.muted,
+    color: themeColors.muted,
     fontSize: 11,
     marginTop: 2,
   },
-});
+}));

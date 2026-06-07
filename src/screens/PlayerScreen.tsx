@@ -21,7 +21,7 @@ import { Artwork } from '../components/Artwork';
 import { RootStackParamList } from '../navigation/types';
 import { useLibraryStore } from '../store/libraryStore';
 import { selectCurrentSong, usePlayerStore } from '../store/playerStore';
-import { colors, radius, spacing } from '../theme';
+import { createThemeStyles, darkColors, lightColors, radius, spacing } from '../theme';
 import { formatTime, pickImage } from '../utils/music';
 import { downloadSong } from '../services/downloads';
 
@@ -44,19 +44,26 @@ export function PlayerScreen({ navigation }: Props) {
   const toggleFavorite = usePlayerStore((s) => s.toggleFavorite);
   const markDownloaded = usePlayerStore((s) => s.markDownloaded);
   const addToQueue = usePlayerStore((s) => s.addToQueue);
+  const theme = usePlayerStore((s) => s.theme);
 
   const playlists = useLibraryStore((s) => s.playlists);
   const addSongToPlaylist = useLibraryStore((s) => s.addSongToPlaylist);
 
   const { toggle, seek, skipNext, skipPrevious } = useAudioControls();
 
-  const isFav = song ? favorites.includes(song.id) : false;
+  const isFav = song ? favorites.some((s) => s.id === song.id) : false;
   const isDownloaded = song ? !!downloaded[song.id] : false;
+  const themeColors = theme === 'dark' ? darkColors : lightColors;
+
+  const gradientColors: [string, string, string] = theme === 'dark'
+    ? ['#2A1810', '#14120F', themeColors.background]
+    : ['#FBEFEA', '#F9F6F5', themeColors.background];
 
   // Menus
   const [showMenu, setShowMenu] = useState(false);
   const [showPlaylistPicker, setShowPlaylistPicker] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [slidingValue, setSlidingValue] = useState<number | null>(null);
 
   const handleSeekForward = () => void seek(Math.min(position + 10, duration));
   const handleSeekBackward = () => void seek(Math.max(position - 10, 0));
@@ -88,10 +95,10 @@ export function PlayerScreen({ navigation }: Props) {
     return (
       <SafeAreaView style={styles.safe}>
         <Pressable onPress={navigation.goBack} style={styles.headerBtn}>
-          <Ionicons name="chevron-back" size={28} color={colors.text} />
+          <Ionicons name="chevron-back" size={28} color={themeColors.text} />
         </Pressable>
         <View style={styles.noSong}>
-          <Ionicons name="headset-outline" size={58} color={colors.subtle} />
+          <Ionicons name="headset-outline" size={58} color={themeColors.subtle} />
           <Text style={styles.noSongTitle}>Choose something to play</Text>
         </View>
       </SafeAreaView>
@@ -101,7 +108,7 @@ export function PlayerScreen({ navigation }: Props) {
   return (
     <View style={styles.safe}>
       <LinearGradient
-        colors={['#2A1810', '#14120F', colors.background]}
+        colors={gradientColors}
         locations={[0, 0.45, 1]}
         style={StyleSheet.absoluteFill}
       />
@@ -114,7 +121,7 @@ export function PlayerScreen({ navigation }: Props) {
             onPress={navigation.goBack}
             style={styles.iconButton}
           >
-            <Ionicons name="chevron-back" size={28} color={colors.text} />
+            <Ionicons name="chevron-back" size={28} color={themeColors.text} />
           </Pressable>
 
           <View style={styles.topCenter}>
@@ -127,7 +134,7 @@ export function PlayerScreen({ navigation }: Props) {
             onPress={() => setShowMenu(true)}
             style={styles.iconButton}
           >
-            <Ionicons name="ellipsis-horizontal" size={24} color={colors.text} />
+            <Ionicons name="ellipsis-horizontal" size={24} color={themeColors.text} />
           </Pressable>
         </View>
 
@@ -152,29 +159,33 @@ export function PlayerScreen({ navigation }: Props) {
             </View>
             <Pressable
               accessibilityLabel={isFav ? 'Remove from favourites' : 'Add to favourites'}
-              onPress={() => toggleFavorite(song.id)}
+              onPress={() => toggleFavorite(song)}
               hitSlop={8}
             >
               <Ionicons
                 name={isFav ? 'heart' : 'heart-outline'}
                 size={26}
-                color={isFav ? colors.accent : colors.text}
+                color={isFav ? themeColors.accent : themeColors.text}
               />
             </Pressable>
           </View>
 
           {/* Seek bar */}
           <Slider
-            value={position}
+            value={slidingValue !== null ? slidingValue : position}
             maximumValue={Math.max(duration, 1)}
-            onSlidingComplete={(value) => void seek(value)}
-            minimumTrackTintColor={colors.accent}
-            maximumTrackTintColor={colors.surfaceElevated}
-            thumbTintColor={colors.accent}
+            onValueChange={(value) => setSlidingValue(value)}
+            onSlidingComplete={async (value) => {
+              await seek(value);
+              setSlidingValue(null);
+            }}
+            minimumTrackTintColor={themeColors.accent}
+            maximumTrackTintColor={themeColors.surfaceElevated}
+            thumbTintColor={themeColors.accent}
             style={styles.slider}
           />
           <View style={styles.timeRow}>
-            <Text style={styles.time}>{formatTime(position)}</Text>
+            <Text style={styles.time}>{formatTime(slidingValue !== null ? slidingValue : position)}</Text>
             <Text style={styles.time}>{formatTime(duration)}</Text>
           </View>
 
@@ -186,7 +197,7 @@ export function PlayerScreen({ navigation }: Props) {
               onPress={skipPrevious}
               style={styles.controlBtn}
             >
-              <Ionicons name="play-skip-back" size={28} color={colors.text} />
+              <Ionicons name="play-skip-back" size={28} color={themeColors.text} />
             </Pressable>
 
             {/* Seek -10s */}
@@ -195,7 +206,7 @@ export function PlayerScreen({ navigation }: Props) {
               onPress={handleSeekBackward}
               style={styles.seekBtn}
             >
-              <Ionicons name="reload" size={22} color={colors.text} />
+              <Ionicons name="reload" size={22} color={themeColors.text} />
               <Text style={styles.seekLabel}>10</Text>
             </Pressable>
 
@@ -208,7 +219,7 @@ export function PlayerScreen({ navigation }: Props) {
               <Ionicons
                 name={isBuffering ? 'hourglass-outline' : isPlaying ? 'pause' : 'play'}
                 size={36}
-                color={colors.white}
+                color={themeColors.white}
                 style={!isPlaying && !isBuffering && { marginLeft: 3 }}
               />
             </Pressable>
@@ -219,7 +230,7 @@ export function PlayerScreen({ navigation }: Props) {
               onPress={handleSeekForward}
               style={styles.seekBtn}
             >
-              <Ionicons name="reload" size={22} color={colors.text} style={{ transform: [{ scaleX: -1 }] }} />
+              <Ionicons name="reload" size={22} color={themeColors.text} style={{ transform: [{ scaleX: -1 }] }} />
               <Text style={styles.seekLabel}>10</Text>
             </Pressable>
 
@@ -229,7 +240,7 @@ export function PlayerScreen({ navigation }: Props) {
               onPress={skipNext}
               style={styles.controlBtn}
             >
-              <Ionicons name="play-skip-forward" size={28} color={colors.text} />
+              <Ionicons name="play-skip-forward" size={28} color={themeColors.text} />
             </Pressable>
           </View>
 
@@ -240,7 +251,7 @@ export function PlayerScreen({ navigation }: Props) {
               onPress={toggleShuffle}
               style={styles.secondaryBtn}
             >
-              <Ionicons name="shuffle" size={22} color={shuffle ? colors.accent : colors.muted} />
+              <Ionicons name="shuffle" size={22} color={shuffle ? themeColors.accent : themeColors.muted} />
             </Pressable>
 
             <Pressable
@@ -248,7 +259,7 @@ export function PlayerScreen({ navigation }: Props) {
               onPress={() => navigation.navigate('Queue')}
               style={styles.secondaryBtn}
             >
-              <Ionicons name="list" size={22} color={colors.muted} />
+              <Ionicons name="list" size={22} color={themeColors.muted} />
             </Pressable>
 
             <Pressable
@@ -259,7 +270,7 @@ export function PlayerScreen({ navigation }: Props) {
               <Ionicons
                 name={repeatMode === 'one' ? 'repeat' : 'repeat-outline'}
                 size={22}
-                color={repeatMode === 'off' ? colors.muted : colors.accent}
+                color={repeatMode === 'off' ? themeColors.muted : themeColors.accent}
               />
               {repeatMode === 'one' && <Text style={styles.repeatOne}>1</Text>}
             </Pressable>
@@ -269,7 +280,7 @@ export function PlayerScreen({ navigation }: Props) {
               onPress={() => setShowMenu(true)}
               style={styles.secondaryBtn}
             >
-              <Ionicons name="ellipsis-vertical" size={22} color={colors.muted} />
+              <Ionicons name="ellipsis-vertical" size={22} color={themeColors.muted} />
             </Pressable>
           </View>
 
@@ -311,7 +322,7 @@ export function PlayerScreen({ navigation }: Props) {
                 icon: 'heart' as const,
                 label: isFav ? 'Remove from Favourites' : 'Add to Favourites',
                 accent: isFav,
-                action: () => { toggleFavorite(song.id); setShowMenu(false); },
+                action: () => { toggleFavorite(song); setShowMenu(false); },
               },
               {
                 icon: 'list-outline' as const,
@@ -349,13 +360,13 @@ export function PlayerScreen({ navigation }: Props) {
                   <Ionicons
                     name={item.icon}
                     size={19}
-                    color={item.accent ? colors.accent : colors.muted}
+                    color={item.accent ? themeColors.accent : themeColors.muted}
                   />
                 </View>
                 <Text style={[styles.menuItemText, item.accent && styles.menuItemAccent]}>
                   {item.label}
                 </Text>
-                <Ionicons name="chevron-forward" size={14} color={colors.subtle} />
+                <Ionicons name="chevron-forward" size={14} color={themeColors.subtle} />
               </Pressable>
             ))}
           </Pressable>
@@ -377,7 +388,7 @@ export function PlayerScreen({ navigation }: Props) {
 
             {playlists.length === 0 ? (
               <View style={styles.pickerEmpty}>
-                <Ionicons name="list-outline" size={36} color={colors.subtle} />
+                <Ionicons name="list-outline" size={36} color={themeColors.subtle} />
                 <Text style={styles.pickerEmptyText}>No playlists yet. Create one in the Playlists tab.</Text>
               </View>
             ) : (
@@ -397,13 +408,13 @@ export function PlayerScreen({ navigation }: Props) {
                       }}
                     >
                       <View style={styles.menuIconWrap}>
-                        <Ionicons name="musical-notes" size={18} color={colors.accent} />
+                        <Ionicons name="musical-notes" size={18} color={themeColors.accent} />
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.menuItemText}>{item.name}</Text>
                         <Text style={styles.pickerSubtext}>{item.songs.length} songs</Text>
                       </View>
-                      {alreadyAdded && <Ionicons name="checkmark" size={18} color={colors.accent} />}
+                      {alreadyAdded && <Ionicons name="checkmark" size={18} color={themeColors.accent} />}
                     </Pressable>
                   );
                 }}
@@ -416,7 +427,7 @@ export function PlayerScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createThemeStyles((colors) => ({
   safe: { flex: 1, backgroundColor: colors.background },
   player: { flex: 1 },
 
@@ -592,4 +603,4 @@ const styles = StyleSheet.create({
   pickerEmpty: { alignItems: 'center', paddingVertical: spacing.xl, gap: spacing.md },
   pickerEmptyText: { color: colors.muted, fontSize: 14, textAlign: 'center' },
   pickerSubtext: { color: colors.muted, fontSize: 12, marginTop: 2 },
-});
+}));

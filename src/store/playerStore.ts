@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 
 import { RepeatMode, Song } from '../types/music';
+import { ThemeMode, setThemeGetter } from '../theme';
 
 const STORAGE_KEY = '@lokal/player';
 
@@ -11,8 +12,10 @@ type PersistedState = {
   repeatMode: RepeatMode;
   shuffle: boolean;
   downloaded: Record<string, string>;
-  favorites: string[]; // song IDs
-  recentlyPlayed: Song[]; // last 20 played songs
+  favorites: Song[];    // full Song objects so favorites survive queue clearing
+  recentlyPlayed: Song[];
+  audioQuality: string; // persisted quality pref ('96kbps' | '160kbps' | '320kbps')
+  theme: ThemeMode;
 };
 
 type PlayerState = PersistedState & {
@@ -30,13 +33,16 @@ type PlayerState = PersistedState & {
   removeFromQueue: (index: number) => void;
   moveQueueItem: (from: number, to: number) => void;
   clearQueue: () => void;
+  clearDownloads: () => void;
   next: () => void;
   previous: () => void;
   cycleRepeat: () => void;
   toggleShuffle: () => void;
+  setAudioQuality: (quality: string) => void;
   markDownloaded: (songId: string, localUri: string) => void;
-  toggleFavorite: (songId: string) => void;
+  toggleFavorite: (song: Song) => void;
   isFavorite: (songId: string) => boolean;
+  setTheme: (theme: ThemeMode) => void;
 };
 
 const persist = (state: PlayerState) => {
@@ -48,8 +54,12 @@ const persist = (state: PlayerState) => {
     downloaded: state.downloaded,
     favorites: state.favorites,
     recentlyPlayed: state.recentlyPlayed,
+    audioQuality: state.audioQuality,
+    theme: state.theme,
   };
-  void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload)).catch((error) => {
+    console.error('Failed to persist player state:', error);
+  });
 };
 
 export const usePlayerStore = create<PlayerState>((set, get) => ({
@@ -60,6 +70,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   downloaded: {},
   favorites: [],
   recentlyPlayed: [],
+  audioQuality: '320kbps',
+  theme: 'dark',
   hydrated: false,
   shouldPlay: false,
   isPlaying: false,
@@ -72,11 +84,19 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       const saved = await AsyncStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved) as PersistedState;
+        // Migration: old format stored favorites as string[]. Reset to [] if so.
+        const rawFavorites = parsed.favorites ?? [];
+        const favorites: Song[] =
+          rawFavorites.length > 0 && typeof rawFavorites[0] === 'string'
+            ? []
+            : (rawFavorites as Song[]);
         set({
           ...parsed,
           downloaded: parsed.downloaded ?? {},
-          favorites: parsed.favorites ?? [],
+          favorites,
           recentlyPlayed: parsed.recentlyPlayed ?? [],
+          audioQuality: parsed.audioQuality ?? '320kbps',
+          theme: parsed.theme ?? 'dark',
           hydrated: true,
         });
         return;
@@ -147,6 +167,21 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     persist(get());
   },
 
+  clearDownloads: () => {
+    set((state) => ({
+      downloaded: {},
+      queue: state.queue.map((song) => {
+        const { localUri, ...rest } = song;
+        return rest;
+      }),
+      recentlyPlayed: state.recentlyPlayed.map((song) => {
+        const { localUri, ...rest } = song;
+        return rest;
+      }),
+    }));
+    persist(get());
+  },
+
   next: () => {
     const state = get();
     if (!state.queue.length) return;
@@ -201,17 +236,30 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     persist(get());
   },
 
-  toggleFavorite: (songId) => {
+  toggleFavorite: (song) => {
     const { favorites } = get();
-    const newFavorites = favorites.includes(songId)
-      ? favorites.filter((id) => id !== songId)
-      : [...favorites, songId];
+    const newFavorites = favorites.some((s) => s.id === song.id)
+      ? favorites.filter((s) => s.id !== song.id)
+      : [...favorites, song];
     set({ favorites: newFavorites });
     persist(get());
   },
 
-  isFavorite: (songId) => get().favorites.includes(songId),
+  isFavorite: (songId) => get().favorites.some((s) => s.id === songId),
+
+  setAudioQuality: (audioQuality) => {
+    set({ audioQuality });
+    persist(get());
+  },
+
+  setTheme: (theme) => {
+    set({ theme });
+    persist(get());
+  },
 }));
 
 export const selectCurrentSong = (state: PlayerState) =>
   state.queue[state.currentIndex];
+
+// Connect the store theme state to the global theme colors helper
+setThemeGetter(() => usePlayerStore.getState().theme || 'dark');

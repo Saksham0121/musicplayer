@@ -11,7 +11,7 @@ import { HomeScreen } from '../screens/HomeScreen';
 import { PlaylistsScreen } from '../screens/PlaylistsScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { usePlayerStore, selectCurrentSong } from '../store/playerStore';
-import { colors, spacing } from '../theme';
+import { darkColors, lightColors, spacing } from '../theme';
 
 const Tab = createBottomTabNavigator<TabParamList>();
 
@@ -35,6 +35,9 @@ function CustomTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const song = usePlayerStore(selectCurrentSong);
   const rootNavigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const theme = usePlayerStore((s) => s.theme);
+  const themeColors = theme === 'dark' ? darkColors : lightColors;
+  const styles = getStyles(themeColors);
 
   return (
     <View style={[styles.tabBarContainer, { paddingBottom: Math.max(insets.bottom, 4) }]}>
@@ -70,7 +73,7 @@ function CustomTabBar({ state, navigation }: BottomTabBarProps) {
                 <Ionicons
                   name={isFocused ? config.activeIcon : config.icon}
                   size={21}
-                  color={isFocused ? colors.accent : colors.subtle}
+                  color={isFocused ? themeColors.accent : themeColors.subtle}
                 />
               </View>
               <Text style={[styles.tabLabel, isFocused && styles.tabLabelActive]} numberOfLines={1}>
@@ -98,11 +101,11 @@ export function TabNavigator() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (themeColors: typeof darkColors) => StyleSheet.create({
   tabBarContainer: {
-    backgroundColor: colors.background,
+    backgroundColor: themeColors.background,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: themeColors.border,
   },
   tabBar: {
     height: TAB_BAR_HEIGHT,
@@ -124,16 +127,16 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   tabIconWrapActive: {
-    backgroundColor: `${colors.accent}20`,
+    backgroundColor: `${themeColors.accent}20`,
   },
   tabLabel: {
     fontSize: 10,
     fontWeight: '600',
-    color: colors.subtle,
+    color: themeColors.subtle,
     letterSpacing: 0.2,
   },
   tabLabelActive: {
-    color: colors.accent,
+    color: themeColors.accent,
     fontWeight: '700',
   },
 });

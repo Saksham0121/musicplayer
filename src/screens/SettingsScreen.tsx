@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import {
   Alert,
   Pressable,
@@ -12,7 +12,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { usePlayerStore } from '../store/playerStore';
-import { colors, radius, spacing } from '../theme';
+import { darkColors, lightColors, radius, spacing } from '../theme';
+import { clearDownloadedFiles } from '../services/downloads';
 
 type AudioQuality = '96kbps' | '160kbps' | '320kbps';
 const QUALITY_KEY = '@lokal/quality';
@@ -25,22 +26,25 @@ const QUALITY_OPTIONS: Array<{ value: AudioQuality; label: string; desc: string 
 ];
 
 function SettingSection({ title, children }: { title: string; children: React.ReactNode }) {
+  const theme = usePlayerStore((s) => s.theme);
+  const themeColors = theme === 'dark' ? darkColors : lightColors;
+  const styles = getSectionStyles(themeColors);
   return (
-    <View style={sectionStyles.wrap}>
-      <Text style={sectionStyles.title}>{title}</Text>
-      <View style={sectionStyles.card}>{children}</View>
+    <View style={styles.wrap}>
+      <Text style={styles.title}>{title}</Text>
+      <View style={styles.card}>{children}</View>
     </View>
   );
 }
 
-const sectionStyles = StyleSheet.create({
+const getSectionStyles = (themeColors: typeof darkColors) => StyleSheet.create({
   wrap: { marginBottom: spacing.xl },
-  title: { color: colors.muted, fontSize: 11, fontWeight: '700', letterSpacing: 1.2, marginBottom: spacing.sm, paddingHorizontal: spacing.md },
+  title: { color: themeColors.muted, fontSize: 11, fontWeight: '700', letterSpacing: 1.2, marginBottom: spacing.sm, paddingHorizontal: spacing.md },
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: themeColors.surface,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: themeColors.border,
     overflow: 'hidden',
   },
 });
@@ -60,27 +64,30 @@ function SettingRow({
   danger?: boolean;
   last?: boolean;
 }) {
+  const theme = usePlayerStore((s) => s.theme);
+  const themeColors = theme === 'dark' ? darkColors : lightColors;
+  const styles = getRowStyles(themeColors);
   return (
     <Pressable
       style={({ pressed }) => [
-        rowStyles.row,
-        !last && rowStyles.border,
-        pressed && rowStyles.pressed,
+        styles.row,
+        !last && styles.border,
+        pressed && styles.pressed,
       ]}
       onPress={onPress}
       disabled={!onPress}
     >
-      <View style={[rowStyles.icon, danger && rowStyles.iconDanger]}>
-        <Ionicons name={icon} size={18} color={danger ? colors.danger : colors.accent} />
+      <View style={[styles.icon, danger && styles.iconDanger]}>
+        <Ionicons name={icon} size={18} color={danger ? themeColors.danger : themeColors.accent} />
       </View>
-      <Text style={[rowStyles.label, danger && rowStyles.labelDanger]}>{label}</Text>
-      {value ? <Text style={rowStyles.value}>{value}</Text> : null}
-      {onPress && !danger && <Ionicons name="chevron-forward" size={16} color={colors.subtle} />}
+      <Text style={[styles.label, danger && styles.labelDanger]}>{label}</Text>
+      {value ? <Text style={styles.value}>{value}</Text> : null}
+      {onPress && !danger && <Ionicons name="chevron-forward" size={16} color={themeColors.subtle} />}
     </Pressable>
   );
 }
 
-const rowStyles = StyleSheet.create({
+const getRowStyles = (themeColors: typeof darkColors) => StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -88,39 +95,48 @@ const rowStyles = StyleSheet.create({
     paddingVertical: 14,
     gap: spacing.md,
   },
-  border: { borderBottomWidth: 1, borderBottomColor: `${colors.border}80` },
-  pressed: { backgroundColor: colors.surfaceElevated },
+  border: { borderBottomWidth: 1, borderBottomColor: `${themeColors.border}80` },
+  pressed: { backgroundColor: themeColors.surfaceElevated },
   icon: {
     width: 34,
     height: 34,
     borderRadius: 10,
-    backgroundColor: `${colors.accent}18`,
+    backgroundColor: `${themeColors.accent}18`,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconDanger: { backgroundColor: `${colors.danger}18` },
-  label: { flex: 1, color: colors.text, fontSize: 15, fontWeight: '600' },
-  labelDanger: { color: colors.danger },
-  value: { color: colors.muted, fontSize: 13 },
+  iconDanger: { backgroundColor: `${themeColors.danger}18` },
+  label: { flex: 1, color: themeColors.text, fontSize: 15, fontWeight: '600' },
+  labelDanger: { color: themeColors.danger },
+  value: { color: themeColors.muted, fontSize: 13 },
 });
 
 export function SettingsScreen() {
   const downloaded = usePlayerStore((s) => s.downloaded);
-  const queue = usePlayerStore((s) => s.queue);
-  const markDownloaded = usePlayerStore((s) => s.markDownloaded);
-  const clearQueue = usePlayerStore((s) => s.clearQueue);
+  const audioQuality = usePlayerStore((s) => s.audioQuality) as AudioQuality;
+  const setAudioQuality = usePlayerStore((s) => s.setAudioQuality);
+  const clearDownloads = usePlayerStore((s) => s.clearDownloads);
 
-  const [quality, setQuality] = useState<AudioQuality>('320kbps');
+  const themeState = usePlayerStore((s) => s.theme);
+  const setTheme = usePlayerStore((s) => s.setTheme);
+
+  const quality = audioQuality;
   const downloadedCount = Object.keys(downloaded).length;
+
+  const themeColors = themeState === 'dark' ? darkColors : lightColors;
+  const styles = getStyles(themeColors);
+  const qualityStyles = getQualityStyles(themeColors);
 
   useEffect(() => {
     AsyncStorage.getItem(QUALITY_KEY).then((val) => {
-      if (val) setQuality(val as AudioQuality);
+      if (val && val !== audioQuality) {
+        setAudioQuality(val);
+      }
     }).catch(() => {});
   }, []);
 
   const handleQualityChange = async (q: AudioQuality) => {
-    setQuality(q);
+    setAudioQuality(q);
     await AsyncStorage.setItem(QUALITY_KEY, q).catch(() => {});
   };
 
@@ -134,8 +150,8 @@ export function SettingsScreen() {
           text: 'Clear',
           style: 'destructive',
           onPress: () => {
-            // Reset downloaded map in store by clearing queue's localUris
-            clearQueue();
+            clearDownloads();
+            void clearDownloadedFiles();
             Alert.alert('Done', 'Downloaded songs cleared.');
           },
         },
@@ -154,6 +170,32 @@ export function SettingsScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
+        {/* ── Theme ─────────────────────────────────────────────── */}
+        <SettingSection title="THEME">
+          {[
+            { value: 'dark' as const, label: 'Dark Mode', desc: 'Saves battery · Easy on eyes' },
+            { value: 'light' as const, label: 'Light Mode', desc: 'Clean, iOS-style appearance' },
+          ].map((opt, i, arr) => (
+            <Pressable
+              key={opt.value}
+              style={({ pressed }) => [
+                qualityStyles.row,
+                i < arr.length - 1 && qualityStyles.border,
+                pressed && qualityStyles.pressed,
+              ]}
+              onPress={() => setTheme(opt.value)}
+            >
+              <View style={qualityStyles.text}>
+                <Text style={qualityStyles.label}>{opt.label}</Text>
+                <Text style={qualityStyles.desc}>{opt.desc}</Text>
+              </View>
+              <View style={[qualityStyles.radio, themeState === opt.value && qualityStyles.radioActive]}>
+                {themeState === opt.value && <View style={qualityStyles.radioDot} />}
+              </View>
+            </Pressable>
+          ))}
+        </SettingSection>
+
         {/* ── Audio Quality ─────────────────────────────────────── */}
         <SettingSection title="AUDIO QUALITY">
           {QUALITY_OPTIONS.map((opt, i) => (
@@ -212,7 +254,7 @@ export function SettingsScreen() {
 
         {/* Attribution */}
         <View style={styles.footer}>
-          <Ionicons name="musical-notes" size={20} color={colors.accent} />
+          <Ionicons name="musical-notes" size={20} color={themeColors.accent} />
           <Text style={styles.footerText}>Built with ❤️ using JioSaavn API</Text>
         </View>
       </ScrollView>
@@ -220,7 +262,7 @@ export function SettingsScreen() {
   );
 }
 
-const qualityStyles = StyleSheet.create({
+const getQualityStyles = (themeColors: typeof darkColors) => StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -228,38 +270,38 @@ const qualityStyles = StyleSheet.create({
     paddingVertical: 14,
     gap: spacing.md,
   },
-  border: { borderBottomWidth: 1, borderBottomColor: `${colors.border}80` },
-  pressed: { backgroundColor: colors.surfaceElevated },
+  border: { borderBottomWidth: 1, borderBottomColor: `${themeColors.border}80` },
+  pressed: { backgroundColor: themeColors.surfaceElevated },
   text: { flex: 1 },
-  label: { color: colors.text, fontSize: 15, fontWeight: '600' },
-  desc: { color: colors.muted, fontSize: 12, marginTop: 2 },
+  label: { color: themeColors.text, fontSize: 15, fontWeight: '600' },
+  desc: { color: themeColors.muted, fontSize: 12, marginTop: 2 },
   radio: {
     width: 22,
     height: 22,
     borderRadius: 11,
     borderWidth: 2,
-    borderColor: colors.border,
+    borderColor: themeColors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  radioActive: { borderColor: colors.accent },
+  radioActive: { borderColor: themeColors.accent },
   radioDot: {
     width: 11,
     height: 11,
     borderRadius: 6,
-    backgroundColor: colors.accent,
+    backgroundColor: themeColors.accent,
   },
 });
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+const getStyles = (themeColors: typeof darkColors) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: themeColors.background },
   flex: { flex: 1 },
   header: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     paddingBottom: spacing.lg,
   },
-  heading: { color: colors.text, fontSize: 26, fontWeight: '800' },
+  heading: { color: themeColors.text, fontSize: 26, fontWeight: '800' },
   content: { paddingHorizontal: spacing.lg, paddingBottom: 160, paddingTop: spacing.sm },
   footer: {
     flexDirection: 'row',
@@ -269,5 +311,5 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingBottom: spacing.md,
   },
-  footerText: { color: colors.subtle, fontSize: 13 },
+  footerText: { color: themeColors.subtle, fontSize: 13 },
 });

@@ -6,6 +6,7 @@ import {
   Alert,
   FlatList,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,7 +21,7 @@ import { SongRow } from '../components/SongRow';
 import { RootStackParamList } from '../navigation/types';
 import { Playlist, useLibraryStore } from '../store/libraryStore';
 import { usePlayerStore } from '../store/playerStore';
-import { colors, radius, spacing } from '../theme';
+import { createThemeStyles, darkColors, lightColors, radius, spacing } from '../theme';
 import { Song } from '../types/music';
 import { pickImage } from '../utils/music';
 
@@ -34,6 +35,8 @@ export function PlaylistsScreen() {
   const renamePlaylist = useLibraryStore((s) => s.renamePlaylist);
   const removeSongFromPlaylist = useLibraryStore((s) => s.removeSongFromPlaylist);
   const playSong = usePlayerStore((s) => s.playSong);
+  const theme = usePlayerStore((s) => s.theme);
+  const themeColors = theme === 'dark' ? darkColors : lightColors;
 
   const [view, setView] = useState<View_>('list');
   const [activePlaylist, setActivePlaylist] = useState<Playlist | null>(null);
@@ -127,7 +130,7 @@ export function PlaylistsScreen() {
             }}
             accessibilityLabel="Create playlist"
           >
-            <Ionicons name="add" size={22} color={colors.white} />
+            <Ionicons name="add" size={22} color={themeColors.white} />
           </Pressable>
         </View>
 
@@ -147,7 +150,7 @@ export function PlaylistsScreen() {
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
               <View style={styles.emptyIcon}>
-                <Ionicons name="list" size={36} color={colors.accent} />
+                <Ionicons name="list" size={36} color={themeColors.accent} />
               </View>
               <Text style={styles.emptyTitle}>No playlists yet</Text>
               <Text style={styles.emptyCopy}>
@@ -160,7 +163,7 @@ export function PlaylistsScreen() {
                   setTimeout(() => inputRef.current?.focus(), 150);
                 }}
               >
-                <Ionicons name="add" size={18} color={colors.white} />
+                <Ionicons name="add" size={18} color={themeColors.white} />
                 <Text style={styles.createEmptyText}>Create Playlist</Text>
               </Pressable>
             </View>
@@ -190,7 +193,7 @@ export function PlaylistsScreen() {
           onPress={() => { setView('list'); setActivePlaylist(null); }}
           accessibilityLabel="Back to playlists"
         >
-          <Ionicons name="chevron-back" size={26} color={colors.text} />
+          <Ionicons name="chevron-back" size={26} color={themeColors.text} />
         </Pressable>
         <Text style={styles.detailTitle} numberOfLines={1}>{livePlaylist?.name ?? ''}</Text>
         <Pressable
@@ -198,7 +201,7 @@ export function PlaylistsScreen() {
           onPress={() => livePlaylist && handleRenameOpen(livePlaylist)}
           accessibilityLabel="Rename playlist"
         >
-          <Ionicons name="pencil-outline" size={20} color={colors.muted} />
+          <Ionicons name="pencil-outline" size={20} color={themeColors.muted} />
         </Pressable>
       </View>
 
@@ -215,7 +218,7 @@ export function PlaylistsScreen() {
                   style={styles.playAllBtn}
                   onPress={() => livePlaylist.songs[0] && play(livePlaylist.songs[0], livePlaylist.songs)}
                 >
-                  <Ionicons name="play" size={16} color={colors.white} style={{ marginLeft: 2 }} />
+                  <Ionicons name="play" size={16} color={themeColors.white} style={{ marginLeft: 2 }} />
                   <Text style={styles.playAllText}>Play</Text>
                 </Pressable>
                 <Pressable
@@ -227,7 +230,7 @@ export function PlaylistsScreen() {
                     if (random) play(random, songs);
                   }}
                 >
-                  <Ionicons name="shuffle" size={16} color={colors.accent} />
+                  <Ionicons name="shuffle" size={16} color={themeColors.accent} />
                   <Text style={styles.shuffleText}>Shuffle</Text>
                 </Pressable>
               </View>
@@ -241,7 +244,7 @@ export function PlaylistsScreen() {
         data={livePlaylist?.songs ?? []}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.detailList}
-        renderItem={({ item, index }) => (
+        renderItem={({ item }) => (
           <View style={styles.detailRow}>
             <SongRow
               song={item}
@@ -254,13 +257,13 @@ export function PlaylistsScreen() {
               onPress={() => livePlaylist && removeSongFromPlaylist(livePlaylist.id, item.id)}
               accessibilityLabel="Remove from playlist"
             >
-              <Ionicons name="close-circle-outline" size={22} color={colors.muted} />
+              <Ionicons name="close-circle-outline" size={22} color={themeColors.muted} />
             </Pressable>
           </View>
         )}
         ListEmptyComponent={
           <View style={styles.emptyWrap}>
-            <Ionicons name="musical-note-outline" size={40} color={colors.subtle} />
+            <Ionicons name="musical-note-outline" size={40} color={themeColors.subtle} />
             <Text style={styles.emptyTitle}>No songs yet</Text>
             <Text style={styles.emptyCopy}>Use the ⋮ menu on any song to add it here.</Text>
           </View>
@@ -295,6 +298,8 @@ function PlaylistCard({
   onDelete: () => void;
 }) {
   const [showMenu, setShowMenu] = useState(false);
+  const theme = usePlayerStore((s) => s.theme);
+  const themeColors = theme === 'dark' ? darkColors : lightColors;
 
   return (
     <>
@@ -312,7 +317,7 @@ function PlaylistCard({
           style={styles.cardMenu}
           onPress={(e) => { e.stopPropagation(); setShowMenu(true); }}
         >
-          <Ionicons name="ellipsis-vertical" size={20} color={colors.muted} />
+          <Ionicons name="ellipsis-vertical" size={20} color={themeColors.muted} />
         </Pressable>
       </Pressable>
 
@@ -336,7 +341,7 @@ function PlaylistCard({
                 style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
                 onPress={item.onPress}
               >
-                <Ionicons name={item.icon} size={20} color={item.danger ? colors.danger : colors.muted} />
+                <Ionicons name={item.icon} size={20} color={item.danger ? themeColors.danger : themeColors.muted} />
                 <Text style={[styles.menuItemText, item.danger && styles.menuItemDanger]}>{item.label}</Text>
               </Pressable>
             ))}
@@ -351,11 +356,13 @@ function PlaylistCard({
 function PlaylistArtwork({ songs, size }: { songs: Song[]; size: number }) {
   const images = songs.slice(0, 4).map((s) => pickImage(s, '150x150'));
   const half = size / 2;
+  const theme = usePlayerStore((s) => s.theme);
+  const themeColors = theme === 'dark' ? darkColors : lightColors;
 
   if (images.length === 0) {
     return (
       <View style={[styles.artworkWrap, { width: size, height: size, borderRadius: radius.md }]}>
-        <Ionicons name="musical-notes" size={size * 0.4} color={colors.muted} />
+        <Ionicons name="musical-notes" size={size * 0.4} color={themeColors.muted} />
       </View>
     );
   }
@@ -405,6 +412,9 @@ function CreateModal({
   title?: string;
   confirmLabel?: string;
 }) {
+  const theme = usePlayerStore((s) => s.theme);
+  const themeColors = theme === 'dark' ? darkColors : lightColors;
+
   return (
     <Modal
       visible={visible}
@@ -421,7 +431,7 @@ function CreateModal({
             value={value}
             onChangeText={onChange}
             placeholder="Playlist name"
-            placeholderTextColor={colors.subtle}
+            placeholderTextColor={themeColors.subtle}
             style={styles.modalInput}
             maxLength={60}
             returnKeyType="done"
@@ -447,7 +457,7 @@ function CreateModal({
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-const styles = StyleSheet.create({
+const styles = createThemeStyles((colors) => ({
   safe: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
 
@@ -641,6 +651,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     marginBottom: spacing.lg,
+    ...Platform.select({
+      web: {
+        outlineStyle: 'none',
+      } as any,
+    }),
   },
   modalActions: { flexDirection: 'row', gap: spacing.md },
   cancelBtn: {
@@ -664,4 +679,4 @@ const styles = StyleSheet.create({
   },
   confirmBtnDisabled: { opacity: 0.4 },
   confirmText: { color: colors.white, fontWeight: '800' },
-});
+}));

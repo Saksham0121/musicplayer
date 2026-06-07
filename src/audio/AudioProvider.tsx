@@ -31,6 +31,7 @@ export function AudioProvider({ children }: PropsWithChildren) {
   const currentSong = usePlayerStore(selectCurrentSong);
   const shouldPlay = usePlayerStore((state) => state.shouldPlay);
   const repeatMode = usePlayerStore((state) => state.repeatMode);
+  const audioQuality = usePlayerStore((state) => state.audioQuality);
   const setShouldPlay = usePlayerStore((state) => state.setShouldPlay);
   const setPlaybackStatus = usePlayerStore((state) => state.setPlaybackStatus);
   const next = usePlayerStore((state) => state.next);
@@ -47,7 +48,7 @@ export function AudioProvider({ children }: PropsWithChildren) {
   }, []);
 
   useEffect(() => {
-    const source = pickAudio(currentSong);
+    const source = pickAudio(currentSong, audioQuality);
     if (!currentSong || !source || loadedSongId.current === currentSong.id) return;
 
     loadedSongId.current = currentSong.id;
@@ -61,7 +62,7 @@ export function AudioProvider({ children }: PropsWithChildren) {
       artworkUrl: pickImage(currentSong),
     });
     if (shouldPlay) player.play();
-  }, [currentSong, player, repeatMode, shouldPlay]);
+  }, [currentSong, player, repeatMode, shouldPlay, audioQuality]);
 
   useEffect(() => {
     player.loop = repeatMode === 'one';

@@ -1,5 +1,5 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { colors, spacing } from '../theme';
+import { createThemeStyles, darkColors, spacing } from '../theme';
 
 export type CategoryTabId = 'Suggested' | 'Songs' | 'Artists' | 'Albums' | 'Folders';
 
@@ -37,11 +37,11 @@ export function CategoryTabs({ active, onChange }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createThemeStyles((themeColors) => ({
   scroll: {
     flexGrow: 0,
     borderBottomWidth: 1,
-    borderBottomColor: `${colors.border}60`,
+    borderBottomColor: `${themeColors.border}60`,
   },
   container: {
     paddingHorizontal: spacing.lg,
@@ -56,11 +56,11 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.subtle,
+    color: themeColors.subtle,
     letterSpacing: 0.1,
   },
   labelActive: {
-    color: colors.accent,
+    color: themeColors.accent,
     fontWeight: '700',
   },
   indicator: {
@@ -69,7 +69,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 2.5,
-    backgroundColor: colors.accent,
+    backgroundColor: themeColors.accent,
     borderRadius: 2,
   },
-});
+}));

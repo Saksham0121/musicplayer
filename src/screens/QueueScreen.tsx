@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Artwork } from '../components/Artwork';
 import { RootStackParamList } from '../navigation/types';
 import { selectCurrentSong, usePlayerStore } from '../store/playerStore';
-import { colors, radius, spacing } from '../theme';
+import { colors, createThemeStyles, darkColors, radius, spacing } from '../theme';
 import { pickImage } from '../utils/music';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Queue'>;
@@ -15,6 +15,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Queue'>;
 export function QueueScreen({ navigation }: Props) {
   const queue = usePlayerStore((state) => state.queue);
   const currentSong = usePlayerStore(selectCurrentSong);
+  const theme = usePlayerStore((state) => state.theme);
   const playSong = usePlayerStore((state) => state.playSong);
   const removeFromQueue = usePlayerStore((state) => state.removeFromQueue);
   const moveQueueItem = usePlayerStore((state) => state.moveQueueItem);
@@ -37,7 +38,7 @@ export function QueueScreen({ navigation }: Props) {
 
       <FlatList
         data={queue}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => `${item.id}-${index}`}
         contentContainerStyle={[styles.list, !queue.length && styles.emptyList]}
         renderItem={({ item, index }) => {
           const active = item.id === currentSong?.id;
@@ -98,20 +99,20 @@ export function QueueScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+const styles = createThemeStyles((themeColors) => ({
+  safe: { flex: 1, backgroundColor: themeColors.background },
   header: {
     height: 76,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: themeColors.border,
   },
   headerButton: { width: 50, height: 50, alignItems: 'center', justifyContent: 'center' },
   headerCopy: { flex: 1, alignItems: 'center' },
-  heading: { color: colors.text, fontSize: 20, fontWeight: '800' },
-  subtitle: { color: colors.muted, fontSize: 11, marginTop: 3 },
+  heading: { color: themeColors.text, fontSize: 20, fontWeight: '800' },
+  subtitle: { color: themeColors.muted, fontSize: 11, marginTop: 3 },
   list: { paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: 112 },
   emptyList: { flexGrow: 1 },
   row: {
@@ -122,25 +123,25 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     marginBottom: 3,
   },
-  activeRow: { backgroundColor: colors.accentSoft },
+  activeRow: { backgroundColor: themeColors.accentSoft },
   grab: { width: 28, alignItems: 'center', justifyContent: 'center', gap: 2 },
   artwork: { width: 52, height: 52 },
   copy: { flex: 1, paddingHorizontal: spacing.md },
-  title: { color: colors.text, fontSize: 14, fontWeight: '700' },
-  activeText: { color: colors.accent },
-  artist: { color: colors.muted, fontSize: 12, marginTop: 4 },
+  title: { color: themeColors.text, fontSize: 14, fontWeight: '700' },
+  activeText: { color: themeColors.accent },
+  artist: { color: themeColors.muted, fontSize: 12, marginTop: 4 },
   remove: { width: 36, height: 44, alignItems: 'center', justifyContent: 'center' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 42, paddingBottom: 80 },
   emptyIcon: {
     width: 82,
     height: 82,
     borderRadius: 41,
-    backgroundColor: colors.accentSoft,
+    backgroundColor: themeColors.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emptyTitle: { color: colors.text, fontSize: 20, fontWeight: '800', marginTop: spacing.xl },
-  emptyCopy: { color: colors.muted, textAlign: 'center', lineHeight: 20, marginTop: spacing.sm },
-  explore: { marginTop: spacing.xl, backgroundColor: colors.accent, borderRadius: radius.pill, paddingHorizontal: spacing.xl, paddingVertical: spacing.md },
-  exploreText: { color: colors.white, fontWeight: '800' },
-});
+  emptyTitle: { color: themeColors.text, fontSize: 20, fontWeight: '800', marginTop: spacing.xl },
+  emptyCopy: { color: themeColors.muted, textAlign: 'center', lineHeight: 20, marginTop: spacing.sm },
+  explore: { marginTop: spacing.xl, backgroundColor: themeColors.accent, borderRadius: radius.pill, paddingHorizontal: spacing.xl, paddingVertical: spacing.md },
+  exploreText: { color: themeColors.white, fontWeight: '800' },
+}));

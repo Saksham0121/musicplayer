@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing } from '../theme';
+import { colors, createThemeStyles, darkColors, radius, spacing } from '../theme';
 import { SortOption } from '../types/music';
 
 type SortConfig = {
@@ -78,32 +78,32 @@ export function SortPicker({ visible, current, onSelect, onClose }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createThemeStyles((themeColors) => ({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: colors.surface,
+    backgroundColor: themeColors.surface,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
     paddingTop: spacing.md,
     paddingBottom: spacing.xxl,
     paddingHorizontal: spacing.xl,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: themeColors.border,
   },
   handle: {
     width: 38,
     height: 4,
-    backgroundColor: colors.border,
+    backgroundColor: themeColors.border,
     borderRadius: 2,
     alignSelf: 'center',
     marginBottom: spacing.xl,
   },
   heading: {
-    color: colors.text,
+    color: themeColors.text,
     fontSize: 18,
     fontWeight: '800',
     marginBottom: spacing.lg,
@@ -118,27 +118,27 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   optionSelected: {
-    backgroundColor: `${colors.accent}15`,
+    backgroundColor: `${themeColors.accent}15`,
   },
   optionIcon: {
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: colors.surfaceElevated,
+    backgroundColor: themeColors.surfaceElevated,
     alignItems: 'center',
     justifyContent: 'center',
   },
   optionIconActive: {
-    backgroundColor: `${colors.accent}25`,
+    backgroundColor: `${themeColors.accent}25`,
   },
   optionLabel: {
     flex: 1,
-    color: colors.muted,
+    color: themeColors.muted,
     fontSize: 15,
     fontWeight: '600',
   },
   optionLabelActive: {
-    color: colors.text,
+    color: themeColors.text,
     fontWeight: '700',
   },
-});
+}));

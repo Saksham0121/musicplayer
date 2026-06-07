@@ -14,18 +14,22 @@ import { PlayerScreen } from './src/screens/PlayerScreen';
 import { QueueScreen } from './src/screens/QueueScreen';
 import { useLibraryStore } from './src/store/libraryStore';
 import { usePlayerStore } from './src/store/playerStore';
-import { colors } from './src/theme';
+import { darkColors, lightColors } from './src/theme';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App() {
   const hydrate = usePlayerStore((state) => state.hydrate);
   const hydrateLibrary = useLibraryStore((state) => state.hydrate);
+  const theme = usePlayerStore((state) => state.theme);
 
   useEffect(() => {
     hydrate();
     hydrateLibrary();
   }, [hydrate, hydrateLibrary]);
+
+  const isDark = theme === 'dark';
+  const themeColors = isDark ? darkColors : lightColors;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -33,14 +37,14 @@ export default function App() {
         <AudioProvider>
           <NavigationContainer
             theme={{
-              dark: true,
+              dark: isDark,
               colors: {
-                primary: colors.accent,
-                background: colors.background,
-                card: colors.background,
-                text: colors.text,
-                border: colors.border,
-                notification: colors.accent,
+                primary: themeColors.accent,
+                background: themeColors.background,
+                card: themeColors.background,
+                text: themeColors.text,
+                border: themeColors.border,
+                notification: themeColors.accent,
               },
               fonts: {
                 regular: { fontFamily: 'System', fontWeight: '400' },
@@ -50,11 +54,11 @@ export default function App() {
               },
             }}
           >
-            <StatusBar style="light" />
+            <StatusBar style={isDark ? 'light' : 'dark'} />
             <Stack.Navigator
               screenOptions={{
                 headerShown: false,
-                contentStyle: { backgroundColor: colors.background },
+                contentStyle: { backgroundColor: themeColors.background },
               }}
             >
               {/* Main tab navigator is the root screen */}

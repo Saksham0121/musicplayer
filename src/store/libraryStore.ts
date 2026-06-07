@@ -21,9 +21,10 @@ type LibraryState = {
   addSongToPlaylist: (playlistId: string, song: Song) => void;
   removeSongFromPlaylist: (playlistId: string, songId: string) => void;
 };
-
 const persist = (state: LibraryState) => {
-  void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ playlists: state.playlists }));
+  AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ playlists: state.playlists })).catch((error) => {
+    console.error('Failed to persist library state:', error);
+  });
 };
 
 export const useLibraryStore = create<LibraryState>((set, get) => ({

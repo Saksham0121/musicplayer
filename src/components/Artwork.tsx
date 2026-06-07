@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image, ImageStyle, StyleProp, StyleSheet, View } from 'react-native';
 
-import { colors } from '../theme';
+import { colors, createThemeStyles } from '../theme';
 
 type Props = {
   uri?: string;
@@ -22,11 +22,11 @@ export function Artwork({ uri, style, radius = 14, fallbackIcon = 'musical-notes
   );
 }
 
-const styles = StyleSheet.create({
-  image: { backgroundColor: colors.surfaceElevated },
+const styles = createThemeStyles((themeColors) => ({
+  image: { backgroundColor: themeColors.surfaceElevated },
   placeholder: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surfaceElevated,
+    backgroundColor: themeColors.surfaceElevated,
   },
-});
+}));
