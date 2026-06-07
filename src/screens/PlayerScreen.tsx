@@ -73,7 +73,7 @@ export function PlayerScreen({ navigation }: Props) {
     setDownloading(true);
     try {
       const uri = await downloadSong(song);
-      markDownloaded(song.id, uri);
+      markDownloaded(song, uri);
       Alert.alert('Downloaded', `"${song.title}" saved for offline listening.`);
     } catch (e) {
       Alert.alert('Download failed', e instanceof Error ? e.message : 'Could not download.');

@@ -28,7 +28,7 @@ type Props = {
 export function SongRow({ song, onPress, showQueueAction = true }: Props) {
   const addToQueue = usePlayerStore((state) => state.addToQueue);
   const markDownloaded = usePlayerStore((state) => state.markDownloaded);
-  const localUri = usePlayerStore((state) => state.downloaded[song.id]);
+  const localUri = usePlayerStore((state) => state.downloaded[song.id]?.localUri);
   const toggleFavorite = usePlayerStore((state) => state.toggleFavorite);
   const favorites = usePlayerStore((state) => state.favorites);
   const playlists = useLibraryStore((state) => state.playlists);
@@ -46,10 +46,11 @@ export function SongRow({ song, onPress, showQueueAction = true }: Props) {
     setDownloading(true);
     try {
       const uri = await downloadSong(effectiveSong);
-      markDownloaded(song.id, uri);
+      markDownloaded(song, uri);
+      Alert.alert('Downloaded', `"${song.title}" saved for offline listening.`);
     } catch (reason) {
       Alert.alert(
-        'Download unavailable',
+        'Download failed',
         reason instanceof Error ? reason.message : 'Could not download this song.',
       );
     } finally {

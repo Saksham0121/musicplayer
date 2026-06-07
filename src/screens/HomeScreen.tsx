@@ -25,7 +25,7 @@ import { HorizontalSongCard } from '../components/HorizontalSongCard';
 import { SORT_LABELS, SortPicker } from '../components/SortPicker';
 import { SongRow } from '../components/SongRow';
 import { RootStackParamList } from '../navigation/types';
-import { usePlayerStore } from '../store/playerStore';
+import { selectCurrentSong, usePlayerStore } from '../store/playerStore';
 import { createThemeStyles, darkColors, lightColors, radius, spacing } from '../theme';
 import { Album, Artist, Song, SortOption } from '../types/music';
 import { formatTime, pickImage } from '../utils/music';
@@ -612,28 +612,22 @@ function AlbumsTab({ albums, loading }: { albums: Album[]; loading: boolean }) {
 // ─── Folders Tab ──────────────────────────────────────────────────────────────
 function FoldersTab() {
   const downloaded = usePlayerStore((s) => s.downloaded);
-  const queue = usePlayerStore((s) => s.queue);
-  const recentlyPlayed = usePlayerStore((s) => s.recentlyPlayed);
-  const favorites = usePlayerStore((s) => s.favorites);
+  const playSong = usePlayerStore((s) => s.playSong);
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const theme = usePlayerStore((s) => s.theme);
   const themeColors = theme === 'dark' ? darkColors : lightColors;
 
-  const downloadedSongs = useMemo(() => {
-    const allSongs = [...queue, ...recentlyPlayed, ...favorites];
-    const uniqueSongs = allSongs.reduce<Song[]>((acc, song) => {
-      if (!acc.some((s) => s.id === song.id)) {
-        acc.push(song);
-      }
-      return acc;
-    }, []);
+  const currentSong = usePlayerStore(selectCurrentSong);
+  const isPlaying = usePlayerStore((s) => s.isPlaying);
 
-    return uniqueSongs
-      .filter((song) => !!downloaded[song.id])
-      .map((song) => ({
-        ...song,
-        localUri: downloaded[song.id],
-      }));
-  }, [queue, recentlyPlayed, favorites, downloaded]);
+  const downloadedSongs = useMemo(() => {
+    return Object.values(downloaded);
+  }, [downloaded]);
+
+  const play = (song: Song, list: Song[]) => {
+    playSong(song, list);
+    navigation.navigate('Player');
+  };
 
   return (
     <ScrollView style={styles.flex} contentContainerStyle={styles.folderContent}>
@@ -650,16 +644,40 @@ function FoldersTab() {
           </Text>
         </View>
       ) : (
-        downloadedSongs.map((song) => (
-          <View key={song.id} style={styles.folderRow}>
-            <Artwork uri={pickImage(song, '150x150')} style={styles.folderArt} radius={8} />
-            <View style={styles.folderInfo}>
-              <Text style={styles.folderSongTitle} numberOfLines={1}>{song.title}</Text>
-              <Text style={styles.folderSongArtist} numberOfLines={1}>{song.artist}</Text>
-            </View>
-            <Text style={styles.folderDuration}>{formatTime(song.duration)}</Text>
-          </View>
-        ))
+        downloadedSongs.map((song) => {
+          const isCurrent = currentSong?.id === song.id;
+          return (
+            <Pressable
+              key={song.id}
+              style={({ pressed }) => [styles.folderRow, pressed && { backgroundColor: themeColors.surface }]}
+              onPress={() => play(song, downloadedSongs)}
+            >
+              <Artwork uri={pickImage(song, '150x150')} style={styles.folderArt} radius={8} />
+              <View style={styles.folderInfo}>
+                <Text style={[styles.folderSongTitle, isCurrent && { color: themeColors.accent }]} numberOfLines={1}>
+                  {song.title}
+                </Text>
+                <Text style={styles.folderSongArtist} numberOfLines={1}>
+                  {song.artist}  ·  {formatTime(song.duration)}
+                </Text>
+              </View>
+              <Pressable
+                hitSlop={8}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  play(song, downloadedSongs);
+                }}
+                style={styles.folderPlayBtn}
+              >
+                <Ionicons
+                  name={isCurrent && isPlaying ? 'pause-circle-outline' : 'play-circle-outline'}
+                  size={22}
+                  color={themeColors.accent}
+                />
+              </Pressable>
+            </Pressable>
+          );
+        })
       )}
     </ScrollView>
   );
@@ -791,8 +809,13 @@ const styles = createThemeStyles((colors) => ({
   folderArt: { width: 46, height: 46 },
   folderInfo: { flex: 1 },
   folderSongTitle: { color: colors.text, fontSize: 14, fontWeight: '700' },
-  folderSongArtist: { color: colors.muted, fontSize: 12, marginTop: 2 },
-  folderDuration: { color: colors.subtle, fontSize: 12 },
+  folderSongArtist: { color: colors.muted, fontSize: 12, marginTop: 4 },
+  folderPlayBtn: {
+    width: 34,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   // Shared
   loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },

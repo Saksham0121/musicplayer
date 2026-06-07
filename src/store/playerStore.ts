@@ -11,7 +11,7 @@ type PersistedState = {
   currentIndex: number;
   repeatMode: RepeatMode;
   shuffle: boolean;
-  downloaded: Record<string, string>;
+  downloaded: Record<string, Song>;
   favorites: Song[];    // full Song objects so favorites survive queue clearing
   recentlyPlayed: Song[];
   audioQuality: string; // persisted quality pref ('96kbps' | '160kbps' | '320kbps')
@@ -39,7 +39,7 @@ type PlayerState = PersistedState & {
   cycleRepeat: () => void;
   toggleShuffle: () => void;
   setAudioQuality: (quality: string) => void;
-  markDownloaded: (songId: string, localUri: string) => void;
+  markDownloaded: (song: Song, localUri: string) => void;
   toggleFavorite: (song: Song) => void;
   isFavorite: (songId: string) => boolean;
   setTheme: (theme: ThemeMode) => void;
@@ -83,16 +83,44 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     try {
       const saved = await AsyncStorage.getItem(STORAGE_KEY);
       if (saved) {
-        const parsed = JSON.parse(saved) as PersistedState;
+        const parsed = JSON.parse(saved) as any;
         // Migration: old format stored favorites as string[]. Reset to [] if so.
         const rawFavorites = parsed.favorites ?? [];
         const favorites: Song[] =
           rawFavorites.length > 0 && typeof rawFavorites[0] === 'string'
             ? []
             : (rawFavorites as Song[]);
+        
+        // Migration: old format stored downloaded as Record<string, string> (localUri).
+        const rawDownloaded = parsed.downloaded ?? {};
+        const downloaded: Record<string, Song> = {};
+        for (const [id, value] of Object.entries(rawDownloaded)) {
+          if (typeof value === 'string') {
+            const existingSong = [...(parsed.queue ?? []), ...(parsed.recentlyPlayed ?? []), ...favorites]
+              .find((s) => s.id === id);
+            if (existingSong) {
+              downloaded[id] = { ...existingSong, localUri: value };
+            } else {
+              downloaded[id] = {
+                id,
+                title: 'Downloaded Track',
+                artist: 'Unknown Artist',
+                album: 'Offline',
+                duration: 0,
+                language: '',
+                images: [],
+                audio: [],
+                localUri: value,
+              };
+            }
+          } else {
+            downloaded[id] = value as Song;
+          }
+        }
+
         set({
           ...parsed,
-          downloaded: parsed.downloaded ?? {},
+          downloaded,
           favorites,
           recentlyPlayed: parsed.recentlyPlayed ?? [],
           audioQuality: parsed.audioQuality ?? '320kbps',
@@ -110,104 +138,140 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   playSong: (song, sourceList) => {
     const downloads = get().downloaded;
     const currentQueue = (sourceList?.length ? sourceList : get().queue).map((item) =>
-      downloads[item.id] ? { ...item, localUri: downloads[item.id] } : item,
+      downloads[item.id] ? { ...item, localUri: downloads[item.id].localUri } : item,
     );
-    const playableSong = downloads[song.id] ? { ...song, localUri: downloads[song.id] } : song;
+    const playableSong = downloads[song.id] ? { ...song, localUri: downloads[song.id].localUri } : song;
     const existingIndex = currentQueue.findIndex((item) => item.id === song.id);
     const queue = existingIndex >= 0 ? currentQueue : [...currentQueue, playableSong];
     const currentIndex = existingIndex >= 0 ? existingIndex : queue.length - 1;
 
     // Update recently played (max 20, most recent first, no duplicates)
-    const prevRecent = get().recentlyPlayed.filter((s) => s.id !== song.id);
-    const recentlyPlayed = [playableSong, ...prevRecent].slice(0, 20);
+    const recent = get().recentlyPlayed;
+    const filteredRecent = recent.filter((r) => r.id !== playableSong.id);
+    const recentlyPlayed = [playableSong, ...filteredRecent].slice(0, 20);
 
-    set({ queue, currentIndex, shouldPlay: true, position: 0, recentlyPlayed });
-    persist(get());
-  },
-
-  setShouldPlay: (shouldPlay) => set({ shouldPlay }),
-  setPlaybackStatus: (status) => set(status),
-
-  addToQueue: (song) => {
-    if (get().queue.some((item) => item.id === song.id)) return;
-    set((state) => ({ queue: [...state.queue, song] }));
-    persist(get());
-  },
-
-  removeFromQueue: (index) => {
-    const state = get();
-    const queue = state.queue.filter((_, itemIndex) => itemIndex !== index);
-    let currentIndex = state.currentIndex;
-    if (index < currentIndex) currentIndex -= 1;
-    if (index === currentIndex) currentIndex = Math.min(currentIndex, queue.length - 1);
     set({
       queue,
       currentIndex,
-      shouldPlay: queue.length > 0 && state.shouldPlay,
+      shouldPlay: true,
+      position: 0,
+      recentlyPlayed,
     });
     persist(get());
   },
 
+  setShouldPlay: (value) => {
+    set({ shouldPlay: value });
+    persist(get());
+  },
+
+  setPlaybackStatus: (status) => {
+    set(status);
+  },
+
+  addToQueue: (song) => {
+    const downloads = get().downloaded;
+    const playableSong = downloads[song.id] ? { ...song, localUri: downloads[song.id].localUri } : song;
+    const { queue, currentIndex } = get();
+    if (queue.some((s) => s.id === playableSong.id)) return;
+    
+    const newQueue = [...queue];
+    newQueue.splice(currentIndex + 1, 0, playableSong);
+    set({ queue: newQueue });
+    persist(get());
+  },
+
+  removeFromQueue: (index) => {
+    const { queue, currentIndex } = get();
+    const newQueue = queue.filter((_, i) => i !== index);
+    let newIndex = currentIndex;
+    if (index < currentIndex) {
+      newIndex = currentIndex - 1;
+    } else if (index === currentIndex) {
+      newIndex = newQueue.length > 0 ? Math.min(currentIndex, newQueue.length - 1) : -1;
+    }
+    set({ queue: newQueue, currentIndex: newIndex });
+    persist(get());
+  },
+
   moveQueueItem: (from, to) => {
-    const state = get();
-    if (to < 0 || to >= state.queue.length || from === to) return;
-    const queue = [...state.queue];
-    const [moved] = queue.splice(from, 1);
-    queue.splice(to, 0, moved);
-    let currentIndex = state.currentIndex;
-    if (currentIndex === from) currentIndex = to;
-    else if (from < currentIndex && to >= currentIndex) currentIndex -= 1;
-    else if (from > currentIndex && to <= currentIndex) currentIndex += 1;
-    set({ queue, currentIndex });
+    const { queue, currentIndex } = get();
+    const newQueue = [...queue];
+    const [moved] = newQueue.splice(from, 1);
+    if (moved) {
+      newQueue.splice(to, 0, moved);
+    }
+    
+    let newIndex = currentIndex;
+    if (currentIndex === from) {
+      newIndex = to;
+    } else if (currentIndex > from && currentIndex <= to) {
+      newIndex = currentIndex - 1;
+    } else if (currentIndex < from && currentIndex >= to) {
+      newIndex = currentIndex + 1;
+    }
+    
+    set({ queue: newQueue, currentIndex: newIndex });
     persist(get());
   },
 
   clearQueue: () => {
-    set({ queue: [], currentIndex: -1, shouldPlay: false, isPlaying: false });
+    set({ queue: [], currentIndex: -1 });
     persist(get());
   },
 
   clearDownloads: () => {
     set((state) => ({
       downloaded: {},
-      queue: state.queue.map((song) => {
-        const { localUri, ...rest } = song;
-        return rest;
-      }),
-      recentlyPlayed: state.recentlyPlayed.map((song) => {
-        const { localUri, ...rest } = song;
-        return rest;
-      }),
+      queue: state.queue.map((song) => ({ ...song, localUri: undefined })),
+      recentlyPlayed: state.recentlyPlayed.map((song) => ({ ...song, localUri: undefined })),
     }));
     persist(get());
   },
 
   next: () => {
-    const state = get();
-    if (!state.queue.length) return;
-    let currentIndex: number;
-    if (state.shuffle && state.queue.length > 1) {
-      do {
-        currentIndex = Math.floor(Math.random() * state.queue.length);
-      } while (currentIndex === state.currentIndex);
-    } else {
-      const atEnd = state.currentIndex >= state.queue.length - 1;
-      if (atEnd && state.repeatMode === 'off') {
-        set({ shouldPlay: false, isPlaying: false, position: 0 });
-        return;
-      }
-      currentIndex = (state.currentIndex + 1) % state.queue.length;
+    const { queue, currentIndex, repeatMode, shuffle } = get();
+    if (queue.length === 0) return;
+    
+    if (shuffle) {
+      const randomIndex = Math.floor(Math.random() * queue.length);
+      set({ currentIndex: randomIndex, shouldPlay: true, position: 0 });
+      persist(get());
+      return;
     }
-    set({ currentIndex, shouldPlay: true, position: 0 });
+    
+    let nextIndex = currentIndex + 1;
+    if (nextIndex >= queue.length) {
+      if (repeatMode === 'all') {
+        nextIndex = 0;
+      } else {
+        return; // stop playback
+      }
+    }
+    set({ currentIndex: nextIndex, shouldPlay: true, position: 0 });
     persist(get());
   },
 
   previous: () => {
-    const state = get();
-    if (!state.queue.length) return;
-    const currentIndex =
-      state.currentIndex <= 0 ? state.queue.length - 1 : state.currentIndex - 1;
-    set({ currentIndex, shouldPlay: true, position: 0 });
+    const { queue, currentIndex, repeatMode, shuffle } = get();
+    if (queue.length === 0) return;
+    
+    if (shuffle) {
+      const randomIndex = Math.floor(Math.random() * queue.length);
+      set({ currentIndex: randomIndex, shouldPlay: true, position: 0 });
+      persist(get());
+      return;
+    }
+    
+    let prevIndex = currentIndex - 1;
+    if (prevIndex < 0) {
+      if (repeatMode === 'all') {
+        prevIndex = queue.length - 1;
+      } else {
+        prevIndex = 0;
+      }
+    }
+    set({ currentIndex: prevIndex, shouldPlay: true, position: 0 });
     persist(get());
   },
 
@@ -226,11 +290,15 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     persist(get());
   },
 
-  markDownloaded: (songId, localUri) => {
+  markDownloaded: (song, localUri) => {
+    const downloadedSong = { ...song, localUri };
     set((state) => ({
-      downloaded: { ...state.downloaded, [songId]: localUri },
-      queue: state.queue.map((song) =>
-        song.id === songId ? { ...song, localUri } : song,
+      downloaded: { ...state.downloaded, [song.id]: downloadedSong },
+      queue: state.queue.map((item) =>
+        item.id === song.id ? { ...item, localUri } : item,
+      ),
+      recentlyPlayed: state.recentlyPlayed.map((item) =>
+        item.id === song.id ? { ...item, localUri } : item,
       ),
     }));
     persist(get());
@@ -258,8 +326,13 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 }));
 
-export const selectCurrentSong = (state: PlayerState) =>
-  state.queue[state.currentIndex];
-
 // Connect the store theme state to the global theme colors helper
 setThemeGetter(() => usePlayerStore.getState().theme || 'dark');
+
+export const selectCurrentSong = (state: PlayerState): Song | undefined => {
+  const { queue, currentIndex } = state;
+  if (currentIndex >= 0 && currentIndex < queue.length) {
+    return queue[currentIndex];
+  }
+  return undefined;
+};
