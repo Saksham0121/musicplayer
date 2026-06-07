@@ -72,11 +72,13 @@ export const decodeText = (value = '') =>
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>');
 
+const toHttps = (url: string) => url.replace(/^http:\/\//i, 'https://');
+
 const normalizeMedia = (items: RawMedia[] = []) =>
   items
     .map((item) => ({
       quality: item.quality ?? '',
-      url: item.url ?? item.link ?? '',
+      url: toHttps(item.url ?? item.link ?? ''),
     }))
     .filter((item) => Boolean(item.url));
 
@@ -102,9 +104,10 @@ const pickArtistImage = (raw: RawArtist): string | undefined => {
       const qb = parseInt(b.quality ?? '0');
       return qb - qa;
     });
-    return sorted[0]?.url ?? sorted[0]?.link ?? undefined;
+    const url = sorted[0]?.url ?? sorted[0]?.link ?? undefined;
+    return url ? toHttps(url) : undefined;
   }
-  if (typeof raw.image === 'string') return raw.image;
+  if (typeof raw.image === 'string') return toHttps(raw.image);
   return undefined;
 };
 
@@ -126,7 +129,8 @@ const normalizeAlbum = (raw: RawAlbum): Album => ({
           const qb = parseInt(b.quality ?? '0');
           return qb - qa;
         });
-        return sorted[0]?.url ?? sorted[0]?.link ?? undefined;
+        const url = sorted[0]?.url ?? sorted[0]?.link ?? undefined;
+        return url ? toHttps(url) : undefined;
       })()
     : undefined,
 });

@@ -122,6 +122,7 @@ function mergeArtists(apiArtists: Artist[], songs: Song[]): Artist[] {
   const merged: Artist[] = [];
   const seen = new Set<string>();
 
+  // API artists come first — they have real artist profile photos
   apiArtists.forEach((a) => {
     const lowerName = a.name.toLowerCase().trim();
     if (lowerName && !seen.has(lowerName)) {
@@ -130,6 +131,9 @@ function mergeArtists(apiArtists: Artist[], songs: Song[]): Artist[] {
     }
   });
 
+  // Extract additional artist names from song metadata.
+  // We do NOT use song cover art as the artist photo — it's the album artwork,
+  // not a portrait of the artist.
   songs.forEach((song) => {
     const parts = song.artist.split(/,|&|·/).map((s) => s.trim());
     parts.forEach((part) => {
@@ -140,7 +144,7 @@ function mergeArtists(apiArtists: Artist[], songs: Song[]): Artist[] {
         merged.push({
           id: `extracted-artist-${part}`,
           name: part,
-          image: song.images[0]?.url,
+          image: undefined, // no real artist photo available from song metadata
         });
       }
     });
@@ -240,7 +244,7 @@ export function HomeScreen() {
 
   useEffect(() => {
     songs.slice(0, 200).forEach((song) => {
-      const uri = pickImage(song, '150x150');
+      const uri = pickImage(song, 150);
       if (uri) {
         Image.prefetch(uri).catch(() => { });
       }
@@ -735,7 +739,7 @@ function FoldersTab() {
               style={({ pressed }) => [styles.folderRow, pressed && { backgroundColor: themeColors.surface }]}
               onPress={() => play(song, downloadedSongs)}
             >
-              <Artwork uri={pickImage(song, '150x150')} style={styles.folderArt} radius={8} />
+              <Artwork uri={pickImage(song, 150)} style={styles.folderArt} radius={8} />
               <View style={styles.folderInfo}>
                 <Text style={[styles.folderSongTitle, isCurrent && { color: themeColors.accent }]} numberOfLines={1}>
                   {song.title}

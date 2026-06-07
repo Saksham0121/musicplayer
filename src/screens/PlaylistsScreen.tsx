@@ -354,7 +354,7 @@ function PlaylistCard({
 
 // ─── PlaylistArtwork ─────────────────────────────────────────────────────────
 function PlaylistArtwork({ songs, size }: { songs: Song[]; size: number }) {
-  const images = songs.slice(0, 4).map((s) => pickImage(s, '150x150'));
+  const images = songs.slice(0, 4).map((s) => pickImage(s, 150));
   const half = size / 2;
   const theme = usePlayerStore((s) => s.theme);
   const themeColors = theme === 'dark' ? darkColors : lightColors;

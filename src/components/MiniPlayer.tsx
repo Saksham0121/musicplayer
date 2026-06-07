@@ -35,7 +35,7 @@ export function MiniPlayer({ navigation }: Props) {
         style={styles.progress}
       />
       <Pressable style={styles.content} onPress={() => navigation.navigate('Player')}>
-        <Artwork uri={pickImage(song, '150x150')} style={styles.artwork} radius={10} />
+        <Artwork uri={pickImage(song, 150)} style={styles.artwork} radius={10} />
         <View style={styles.copy}>
           <Text style={styles.title} numberOfLines={1}>
             {song.title}

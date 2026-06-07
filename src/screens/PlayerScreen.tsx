@@ -309,7 +309,7 @@ export function PlayerScreen({ navigation }: Props) {
 
             {/* Song info */}
             <View style={styles.menuSongInfo}>
-              <Artwork uri={pickImage(song, '150x150')} style={styles.menuArtwork} radius={10} />
+              <Artwork uri={pickImage(song, 150)} style={styles.menuArtwork} radius={10} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.menuSongTitle} numberOfLines={1}>{song.title}</Text>
                 <Text style={styles.menuSongArtist} numberOfLines={1}>{song.artist}</Text>

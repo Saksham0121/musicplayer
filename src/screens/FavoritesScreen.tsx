@@ -69,7 +69,7 @@ export function FavoritesScreen() {
         contentContainerStyle={styles.list}
         renderItem={({ item }) => (
           <Pressable style={styles.row} onPress={() => play(item)}>
-            <Artwork uri={pickImage(item, '150x150')} style={styles.artwork} radius={radius.sm} />
+            <Artwork uri={pickImage(item, 150)} style={styles.artwork} radius={radius.sm} />
             <View style={styles.copy}>
               <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
               <Text style={styles.artist} numberOfLines={1}>{item.artist}</Text>

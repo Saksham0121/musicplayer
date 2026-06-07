@@ -64,7 +64,7 @@ export function SongRow({ song, onPress, showQueueAction = true }: Props) {
         onPress={onPress}
         style={({ pressed }) => [styles.row, pressed && styles.pressed]}
       >
-        <Artwork uri={pickImage(song, '150x150')} style={styles.artwork} radius={12} />
+        <Artwork uri={pickImage(song, 150)} style={styles.artwork} radius={12} />
         <View style={styles.copy}>
           <Text style={styles.title} numberOfLines={1}>
             {song.title}
@@ -122,7 +122,7 @@ export function SongRow({ song, onPress, showQueueAction = true }: Props) {
             <View style={styles.menuHandle} />
             {/* Song info */}
             <View style={styles.menuSongInfo}>
-              <Artwork uri={pickImage(song, '150x150')} style={styles.menuArtwork} radius={8} />
+              <Artwork uri={pickImage(song, 150)} style={styles.menuArtwork} radius={8} />
               <View style={styles.menuSongText}>
                 <Text style={styles.menuSongTitle} numberOfLines={1}>{song.title}</Text>
                 <Text style={styles.menuSongArtist} numberOfLines={1}>{song.artist}</Text>

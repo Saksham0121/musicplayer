@@ -58,7 +58,7 @@ export function QueueScreen({ navigation }: Props) {
                   <Ionicons name="chevron-down" size={18} color={index === queue.length - 1 ? colors.subtle : colors.muted} />
                 </Pressable>
               </View>
-              <Artwork uri={pickImage(item, '150x150')} style={styles.artwork} radius={11} />
+              <Artwork uri={pickImage(item, 150)} style={styles.artwork} radius={11} />
               <View style={styles.copy}>
                 <Text style={[styles.title, active && styles.activeText]} numberOfLines={1}>
                   {item.title}

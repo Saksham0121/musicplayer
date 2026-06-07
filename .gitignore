@@ -44,5 +44,6 @@ yarn-error.*
 .stitch/
 .gemini/
 
-# markdown files
+# markdown files (keep README.md tracked for GitHub)
 *.md
+!README.md
