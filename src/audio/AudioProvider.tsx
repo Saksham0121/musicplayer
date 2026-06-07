@@ -29,6 +29,7 @@ export function AudioProvider({ children }: PropsWithChildren) {
   const player = useAudioPlayer(null, { updateInterval: 250 });
   const status = useAudioPlayerStatus(player);
   const currentSong = usePlayerStore(selectCurrentSong);
+  const currentIndex = usePlayerStore((state) => state.currentIndex);
   const shouldPlay = usePlayerStore((state) => state.shouldPlay);
   const repeatMode = usePlayerStore((state) => state.repeatMode);
   const audioQuality = usePlayerStore((state) => state.audioQuality);
@@ -36,7 +37,9 @@ export function AudioProvider({ children }: PropsWithChildren) {
   const setPlaybackStatus = usePlayerStore((state) => state.setPlaybackStatus);
   const next = usePlayerStore((state) => state.next);
   const previous = usePlayerStore((state) => state.previous);
-  const loadedSongId = useRef<string | undefined>(undefined);
+  // Track the loaded song by id+index so the same song at a different
+  // queue position (new list) still triggers a reload.
+  const loadedSongKey = useRef<string>('');
   const handledFinish = useRef(false);
 
   useEffect(() => {
@@ -49,10 +52,13 @@ export function AudioProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     const source = pickAudio(currentSong, audioQuality);
-    if (!currentSong || !source || loadedSongId.current === currentSong.id) return;
+    const newKey = currentSong ? `${currentSong.id}:${currentIndex}` : '';
+    if (!currentSong || !source || loadedSongKey.current === newKey) return;
 
-    loadedSongId.current = currentSong.id;
-    handledFinish.current = false;
+    loadedSongKey.current = newKey;
+    // Do NOT reset handledFinish here — let the status effect manage it via
+    // !status.didJustFinish. Resetting it here caused a double-next() race
+    // that skipped songs when a new track loaded while didJustFinish was still true.
     player.replace({ uri: source, name: currentSong.title });
     player.loop = repeatMode === 'one';
     player.setActiveForLockScreen(true, {
@@ -62,7 +68,7 @@ export function AudioProvider({ children }: PropsWithChildren) {
       artworkUrl: pickImage(currentSong),
     });
     if (shouldPlay) player.play();
-  }, [currentSong, player, repeatMode, shouldPlay, audioQuality]);
+  }, [currentSong, currentIndex, player, repeatMode, shouldPlay, audioQuality]);
 
   useEffect(() => {
     player.loop = repeatMode === 'one';

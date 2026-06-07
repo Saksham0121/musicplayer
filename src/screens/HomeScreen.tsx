@@ -118,6 +118,66 @@ const sectionStyles = createThemeStyles((colors) => ({
   seeAll: { color: colors.accent, fontSize: 13, fontWeight: '700' },
 }));
 
+function mergeArtists(apiArtists: Artist[], songs: Song[]): Artist[] {
+  const merged: Artist[] = [];
+  const seen = new Set<string>();
+
+  apiArtists.forEach((a) => {
+    const lowerName = a.name.toLowerCase().trim();
+    if (lowerName && !seen.has(lowerName)) {
+      seen.add(lowerName);
+      merged.push(a);
+    }
+  });
+
+  songs.forEach((song) => {
+    const parts = song.artist.split(/,|&|·/).map((s) => s.trim());
+    parts.forEach((part) => {
+      if (!part) return;
+      const lowerPart = part.toLowerCase();
+      if (!seen.has(lowerPart)) {
+        seen.add(lowerPart);
+        merged.push({
+          id: `extracted-artist-${part}`,
+          name: part,
+          image: song.images[0]?.url,
+        });
+      }
+    });
+  });
+
+  return merged;
+}
+
+function mergeAlbums(apiAlbums: Album[], songs: Song[]): Album[] {
+  const merged: Album[] = [];
+  const seen = new Set<string>();
+
+  apiAlbums.forEach((al) => {
+    const lowerName = al.name.toLowerCase().trim();
+    if (lowerName && !seen.has(lowerName)) {
+      seen.add(lowerName);
+      merged.push(al);
+    }
+  });
+
+  songs.forEach((song) => {
+    if (!song.album) return;
+    const lowerAlbum = song.album.toLowerCase().trim();
+    if (!seen.has(lowerAlbum)) {
+      seen.add(lowerAlbum);
+      merged.push({
+        id: `extracted-album-${song.album}`,
+        name: song.album,
+        artist: song.artist,
+        image: song.images[0]?.url,
+      });
+    }
+  });
+
+  return merged;
+}
+
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -242,6 +302,9 @@ export function HomeScreen() {
     if (activeTab === 'Albums') void loadAlbums(query);
   }, [activeTab, query, loadAlbums]);
 
+  const mergedArtists = useMemo(() => mergeArtists(artists, songs), [artists, songs]);
+  const mergedAlbums = useMemo(() => mergeAlbums(albums, songs), [albums, songs]);
+
   // ── Play helpers ──────────────────────────────────────────────────────
   const play = (song: Song, list: Song[]) => {
     playSong(song, list);
@@ -334,14 +397,23 @@ export function HomeScreen() {
 
       {activeTab === 'Artists' && (
         <ArtistsTab
-          artists={artists}
+          artists={mergedArtists}
           loading={loadingArtists}
           onArtistPress={handleArtistClick}
         />
       )}
 
       {activeTab === 'Albums' && (
-        <AlbumsTab albums={albums} loading={loadingAlbums} />
+        <AlbumsTab
+          albums={mergedAlbums}
+          loading={loadingAlbums}
+          onAlbumPress={(albumName) => {
+            setInput(albumName);
+            setQuery(albumName);
+            setActiveTab('Songs');
+            setShowSearch(true);
+          }}
+        />
       )}
 
       {activeTab === 'Folders' && <FoldersTab />}
@@ -567,7 +639,15 @@ function ArtistsTab({
 }
 
 // ─── Albums Tab ───────────────────────────────────────────────────────────────
-function AlbumsTab({ albums, loading }: { albums: Album[]; loading: boolean }) {
+function AlbumsTab({
+  albums,
+  loading,
+  onAlbumPress,
+}: {
+  albums: Album[];
+  loading: boolean;
+  onAlbumPress: (name: string) => void;
+}) {
   const theme = usePlayerStore((s) => s.theme);
   const themeColors = theme === 'dark' ? darkColors : lightColors;
 
@@ -583,12 +663,15 @@ function AlbumsTab({ albums, loading }: { albums: Album[]; loading: boolean }) {
     <FlatList
       style={styles.flex}
       data={albums}
-      keyExtractor={(item) => item.id}
+      keyExtractor={(item, index) => `${item.id}-${index}`}
       numColumns={2}
       contentContainerStyle={styles.albumsGrid}
       columnWrapperStyle={styles.albumRow}
       renderItem={({ item }) => (
-        <View style={styles.albumCard}>
+        <Pressable
+          style={({ pressed }) => [styles.albumCard, pressed && { opacity: 0.7 }]}
+          onPress={() => onAlbumPress(item.name)}
+        >
           <Artwork
             uri={item.image}
             style={styles.albumArt}
@@ -597,7 +680,7 @@ function AlbumsTab({ albums, loading }: { albums: Album[]; loading: boolean }) {
           <Text style={styles.albumName} numberOfLines={2}>{item.name}</Text>
           <Text style={styles.albumArtist} numberOfLines={1}>{item.artist}</Text>
           {item.year ? <Text style={styles.albumYear}>{item.year}</Text> : null}
-        </View>
+        </Pressable>
       )}
       ListEmptyComponent={
         <View style={styles.emptyCenter}>
